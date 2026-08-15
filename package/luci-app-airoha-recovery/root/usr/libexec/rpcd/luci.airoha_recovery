@@ -10,7 +10,7 @@ RECOVERY_TRIGGER="recovery_trigger"
 
 is_supported()
 {
-	[ "$(board_name 2>/dev/null)" = "gemtek,xr1710g-ubi" ] || return 1
+	case "$(board_name 2>/dev/null)" in gemtek,w1700k-ubi|gemtek,xr1710g-ubi) ;; *) return 1 ;; esac
 	[ -x /usr/sbin/fw_setenv ] || return 1
 	[ -x /usr/sbin/fw_printenv ] || return 1
 	[ -r /etc/fw_env.config ] || return 1
@@ -64,7 +64,7 @@ get_status()
 	local recovery_active=0
 	local bootcmd=""
 
-	if [ "$board" = "gemtek,xr1710g-ubi" ]; then
+	if [ "$board" = "gemtek,w1700k-ubi" ] || [ "$board" = "gemtek,xr1710g-ubi" ]; then
 		if [ ! -x /usr/sbin/fw_setenv ] || [ ! -x /usr/sbin/fw_printenv ]; then
 			reason="uboot-envtools-missing"
 		elif [ ! -r /etc/fw_env.config ]; then

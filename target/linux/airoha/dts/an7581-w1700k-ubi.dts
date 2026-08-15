@@ -15,10 +15,10 @@
 
 	aliases {
 		serial0 = &uart1;
-		led-boot = &led_status_red;
-		led-failsafe = &led_status_blue;
+		led-boot = &led_status_green;
+		led-failsafe = &led_status_red;
 		led-upgrade = &led_status_blue;
-		led-running = &led_status_green;
+		led-running = &led_status_white;
 	};
 
 	chosen {
@@ -95,7 +95,7 @@
 };
 
 &en7581_pinctrl {
-	gpio-ranges = <&en7581_pinctrl 0 13 47>;
+	gpio-ranges = <&en7581_pinctrl 0 13 50>;
 
 	mdio_pins: mdio-pins {
 		mux {
@@ -366,6 +366,7 @@
 			// interrupts = <22 IRQ_TYPE_LEVEL_LOW>;
 			tx-polarity = <PHY_POL_INVERT>;
 			rx-polarity = <PHY_POL_INVERT>;
+			realtek,sds-mode = <0x88c6>;
 		};
 
 		phy8: ethernet-phy@8 {
@@ -412,4 +413,10 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&hsuart_pins>;
+};
+
+&cpufreq {
+	reg = <0x0 0x1FA20000 0x0 0x2C0
+	       0x0 0x1EFBE000 0x0 0x800>;
+	reg-names = "chip-scu", "mcucfg";
 };

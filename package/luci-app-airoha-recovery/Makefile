@@ -4,11 +4,11 @@ LUCI_NAME:=luci-app-airoha-recovery
 PKG_VERSION:=1.0.0
 PKG_RELEASE:=3
 
-PKG_MAINTAINER:=XR1710G Maintainer
+PKG_MAINTAINER:=Airoha AN7581 Maintainer
 PKG_LICENSE:=GPL-2.0-or-later
-TITLE:=LuCI Airoha XR1710G U-Boot Recovery
+TITLE:=LuCI Airoha AN7581 U-Boot Recovery
 
-LUCI_TITLE:=LuCI Airoha XR1710G U-Boot Recovery
+LUCI_TITLE:=LuCI Airoha AN7581 U-Boot Recovery
 LUCI_DESCRIPTION:=Reboots the device into the U-Boot HTTP recovery environment. \
 	Uses the native one-shot recovery trigger and leaves the normal bootcmd \
 	unchanged.

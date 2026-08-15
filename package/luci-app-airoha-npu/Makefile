@@ -6,11 +6,11 @@ LUCI_NAME:=luci-app-airoha-npu
 PKG_VERSION:=1.1.0
 PKG_RELEASE:=4
 PKG_LICENSE:=Apache-2.0
-PKG_MAINTAINER:=XR1710G Maintainer
-TITLE:=LuCI Airoha XR1710G NPU Status
+PKG_MAINTAINER:=Airoha AN7581 Maintainer
+TITLE:=LuCI Airoha AN7581 NPU Status
 
-LUCI_TITLE:=LuCI Airoha XR1710G NPU Status
-LUCI_DESCRIPTION:=Displays real-time Airoha XR1710G NPU status including NPU utilization, \
+LUCI_TITLE:=LuCI Airoha AN7581 NPU Status
+LUCI_DESCRIPTION:=Displays real-time Airoha AN7581 NPU status including NPU utilization, \
 	CPU frequency and load, frame engine statistics, and supports CPU overclocking.
 LUCI_DEPENDS:=+luci-base +kmod-br-netfilter
 

@@ -4,11 +4,11 @@ LUCI_NAME:=luci-app-airoha-fancontrol
 PKG_VERSION:=1.0.0
 PKG_RELEASE:=1
 
-PKG_MAINTAINER:=XR1710G Maintainer
+PKG_MAINTAINER:=Airoha AN7581 Maintainer
 PKG_LICENSE:=GPL-2.0-or-later
-TITLE:=LuCI Airoha XR1710G Fan Control
+TITLE:=LuCI Airoha AN7581 Fan Control
 
-LUCI_TITLE:=LuCI Airoha XR1710G Fan Control
+LUCI_TITLE:=LuCI Airoha AN7581 Fan Control
 LUCI_DESCRIPTION:=Provides fan speed monitoring and control for Airoha-based devices. \
 	Displays current temperature and fan RPM, supports manual/auto speed modes \
 	and temperature threshold configuration.
