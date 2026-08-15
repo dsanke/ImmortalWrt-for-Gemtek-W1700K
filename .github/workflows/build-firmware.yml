@@ -116,7 +116,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ format('{0}-{1}', steps.date.outputs.date, steps.commit.outputs.short) }}
-          name: ${{ format('{0} - XR1710G Build ({1})', steps.date.outputs.date, steps.commit.outputs.short) }}
+          name: ${{ format('{0} - W1700K Build ({1})', steps.date.outputs.date, steps.commit.outputs.short) }}
           body: ${{ steps.release_body.outputs.body }}
           draft: false
           prerelease: ${{ github.event.inputs.release_type == 'prerelease' }}

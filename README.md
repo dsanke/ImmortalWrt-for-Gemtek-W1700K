@@ -1,6 +1,6 @@
 <img src="https://avatars.githubusercontent.com/u/53193414?s=200&v=4" alt="logo" width="200" height="200" align="right">
 
-# ImmortalWrt for Gemtek XR1710G
+# ImmortalWrt for Gemtek XR1710G / W1700K
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/naoki66/ImmortalWrt-for-Gemtek-XR1710G/build-firmware.yml?branch=master&label=Build)](https://github.com/naoki66/ImmortalWrt-for-Gemtek-XR1710G/actions/workflows/build-firmware.yml)
 [![Sync Status](https://img.shields.io/github/actions/workflow/status/naoki66/ImmortalWrt-for-Gemtek-XR1710G/sync-upstream.yml?branch=master&label=Sync)](https://github.com/naoki66/ImmortalWrt-for-Gemtek-XR1710G/actions/workflows/sync-upstream.yml)
@@ -10,7 +10,7 @@
 [![SoC](https://img.shields.io/badge/SoC-Airoha%20AN7581GT-orange)]()
 [![License](https://img.shields.io/badge/license-GPL--2.0-green)](https://spdx.org/licenses/GPL-2.0-only.html)
 
-基于 [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) 为 Gemtek XR1710G（Brightspeed XR1710G）路由器定制的固件。
+基于 [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) 为 Gemtek XR1710G（Brightspeed XR1710G）与 W1700K（CenturyLink / Lumen / Quantum Fiber）路由器定制的固件。两者为同一 AN7581 平台姊妹机，共享内核补丁、无线栈与 LuCI 定制。
 
 默认管理地址：http://192.168.50.1 或 http://immortalwrt.lan，用户名：**root**，密码：*无*。
 
@@ -148,13 +148,14 @@
 
 **Release 格式**：
 - Tag：`YYYYMMDD-<short-hash>`
-- 名称：`YYYYMMDD - XR1710G Build (<short-hash>)`
+- 名称：`YYYYMMDD - W1700K Build (<short-hash>)`（config.seed 已默认选中 `gemtek_w1700k-ubi`；如需构建 XR1710G，将 config.seed 中两个 `DEVICE_gemtek_*-ubi` 选项互换即可）
 - 选项：`release` / `prerelease` / `none`
 
 ## 下载
 
 - [Releases 页面](https://github.com/naoki66/ImmortalWrt-for-Gemtek-XR1710G/releases)
-- 固件文件：`immortalwrt-airoha-an7581-gemtek_xr1710g-ubi-squashfs-sysupgrade.itb`
+- 固件文件（W1700K）：`immortalwrt-airoha-an7581-gemtek_w1700k-ubi-squashfs-sysupgrade.itb`
+- 固件文件（XR1710G）：`immortalwrt-airoha-an7581-gemtek_xr1710g-ubi-squashfs-sysupgrade.itb`
 - 升级方法：LuCI → 系统 → 备份/升级 → 刷写固件
 
 ## 本地构建（可选）
