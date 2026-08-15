@@ -2,7 +2,7 @@ diff --git a/db.txt b/db.txt
 index 72f7900..ab60b60 100644
 --- a/db.txt
 +++ b/db.txt
-@@ -2081,20 +2081,20 @@ country US: DFS-FCC
+@@ -2081,20 +2081,19 @@ country US: DFS-FCC
  	(920 - 928 @ 8), (30)
  	(2400 - 2472 @ 40), (30)
  	# 5.15 ~ 5.25 GHz: 30 dBm for master mode, 23 dBm for clients
@@ -16,11 +16,11 @@ index 72f7900..ab60b60 100644
  	# happy and be able to use channel 144.
 -	(5470 - 5730 @ 160), (24), DFS
 +	(5470 - 5730 @ 160), (30), AUTO-BW
- 	(5730 - 5850 @ 80), (30), AUTO-BW
+-	(5730 - 5850 @ 80), (30), AUTO-BW
++	(5730 - 5895 @ 160), (30), AUTO-BW
  	# https://www.federalregister.gov/documents/2021/05/03/2021-08802/use-of-the-5850-5925-ghz-band
  	# max. 33 dBm AP @ 20MHz, 36 dBm AP @ 40Mhz+, 6 dB less for clients
 -	(5850 - 5895 @ 40), (27), NO-OUTDOOR, AUTO-BW, NO-IR
-+	(5850 - 5895 @ 40), (36), NO-OUTDOOR, AUTO-BW
  	# 6g band
  	# https://www.federalregister.gov/documents/2020/05/26/2020-11236/unlicensed-use-of-the-6ghz-band
 -	(5925 - 7125 @ 320), (12), NO-OUTDOOR, NO-IR
