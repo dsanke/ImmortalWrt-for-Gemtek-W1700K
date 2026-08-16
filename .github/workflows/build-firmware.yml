@@ -51,6 +51,15 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
+      - name: Install daede optimized dae/daed
+        run: |
+          # The packages feed ships upstream dae/daed.  The daede feed
+          # (src-git daede) provides the optimized dae/daed (performance
+          # fork, QUIC/PGO patches) plus luci-app-daede, so drop the
+          # upstream copies and install the daede ones.
+          rm -rf package/feeds/packages/dae package/feeds/packages/daed
+          ./scripts/feeds install -a -p daede
+
       - name: Configure
         run: |
           cp config.seed .config
