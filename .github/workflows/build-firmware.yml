@@ -51,6 +51,11 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
+      - name: Apply XR1710G feed patches (AdGuardHome no-autostart)
+        run: |
+          git -C feeds/packages apply --check "$GITHUB_WORKSPACE/patches/packages/0200-adguardhome-do-not-autostart-unconfigured.patch"
+          git -C feeds/packages apply "$GITHUB_WORKSPACE/patches/packages/0200-adguardhome-do-not-autostart-unconfigured.patch"
+
       - name: Install daede optimized dae/daed
         run: |
           # The packages feed ships upstream dae/daed.  The daede feed
