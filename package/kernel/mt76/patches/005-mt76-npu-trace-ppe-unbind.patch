@@ -1,0 +1,22 @@
+From: W1700K port <w1700k@localhost>
+Subject: [PATCH] mt76: npu: trace PPE unbind hits on WLAN RX
+
+Temporary trace to confirm whether WLAN RX (STA->AP) frames are punted
+to the CPU with the HIT_UNBIND reason after a STA disconnect/reconnect.
+
+Signed-off-by: W1700K port <w1700k@localhost>
+---
+ npu.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+--- a/npu.c	2026-08-20 19:45:00.085599258 +0800
++++ b/npu.c	2026-08-20 19:45:00.093109460 +0800
+@@ -134,6 +134,8 @@
+ 	reason = FIELD_GET(NPU_RX_DMA_CRSN_MASK, info);
+ 	if (reason == PPE_CPU_REASON_HIT_UNBIND_RATE_REACHED) {
+ 		skb_set_mac_header(skb, 0);
++		pr_debug_ratelimited("mt76_npu: ppe unbind hit hash=%04x dev=%s\n",
++				     hash, skb->dev ? skb->dev->name : "none");
+ 		airoha_ppe_dev_check_skb(ppe_dev, skb, hash, true);
+ 	}
+ out:
