@@ -195,6 +195,7 @@
 
 	reg = <0x0 0x1fc00000 0x0 0x1670>,
 	      <0x0 0x1fc20000 0x0 0x1670>;
+
 	reg-names = "pcie-mac", "sec-pcie-mac";
 
 	resets = <&scuclk EN7581_PCIE0_RST>,
@@ -250,6 +251,7 @@
 		};
 	};
 };
+
 &pcie2 {
 	status = "okay";
 	pinctrl-names = "default";
@@ -274,9 +276,7 @@
 	status = "okay";
 	nvmem-cells = <&lan_mac 0>;
 	nvmem-cell-names = "mac-address";
-};
-&pon_pcs {
-	status = "okay";
+	openwrt,netdev-name = "cpu";
 };
 &gdm2 {
 	status = "okay";
@@ -312,7 +312,6 @@
 			reset-deassert-us = <200000>;
 			tx-polarity = <PHY_POL_INVERT>;
 			rx-polarity = <PHY_POL_INVERT>;
-			realtek,sds-mode = <0x88c6>;
 		};
 		phy8: ethernet-phy@8 {
 			compatible = "ethernet-phy-ieee802.3-c45";
@@ -327,7 +326,6 @@
 };
 &gsw_phy1 {
 	status = "okay";
-	interrupts = <1>;
 };
 &gsw_port1 {
 	status = "okay";
@@ -335,7 +333,6 @@
 };
 &gsw_phy2 {
 	status = "okay";
-	interrupts = <2>;
 };
 &gsw_port2 {
 	status = "okay";
