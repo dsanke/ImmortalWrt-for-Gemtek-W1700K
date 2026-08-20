@@ -2,14 +2,33 @@
 # Copyright (C) 2025 OpenWrt.org
 #
 
-[ -e /etc/config/ubootenv ] && exit 0
-
-touch /etc/config/ubootenv
-
 . /lib/uboot-envtools.sh
 . /lib/functions.sh
 
 board=$(board_name)
+
+# The Gemtek XR1710G / W1700K HTTP-recovery chainloader U-Boot uses
+# CONFIG_ENV_SIZE=0x4000 for its redundant UBI environment.  A preserved
+# config from an older image may point at the correct dynamic UBI volumes
+# while still using the incompatible generic 0x1f000 size, which makes
+# fw_setenv write an environment whose CRC the U-Boot rejects.  Drop the
+# stale files so the exact redundant 0x4000 layout is regenerated below.
+case "$board" in
+gemtek,w1700k-ubi|\
+gemtek,xr1710g-ubi)
+	if [ -e /etc/config/ubootenv ] && [ -e /etc/fw_env.config ] &&
+		[ "$(grep -Ec '^/dev/ubi[0-9]+_[0-9]+[[:space:]]+0x0[[:space:]]+0x4000[[:space:]]+0x1f000[[:space:]]+1$' /etc/fw_env.config)" -eq 2 ]; then
+		exit 0
+	fi
+	rm -f /etc/config/ubootenv /etc/fw_env.config /etc/fw_sys.config
+	;;
+esac
+
+# Other boards keep the existing behavior: an already generated config is
+# left untouched.
+[ -e /etc/config/ubootenv ] && exit 0
+
+touch /etc/config/ubootenv
 
 ubootenv_add_ubi_http_recovery() {
 	. /lib/upgrade/nand.sh
