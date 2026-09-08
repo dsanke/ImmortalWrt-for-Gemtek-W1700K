@@ -1,0 +1,21 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] net: airoha: exclude same-ingress bridge fallback
+
+Retain the new upstream local-MAC classification, which already fixes the
+old PACKET_HOST false positive. Add only the missing same-ingress exclusion
+so bridge fallback cannot bind intra-BSS or port self-loop traffic.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+
+--- a/drivers/net/ethernet/airoha/airoha_ppe.c
++++ b/drivers/net/ethernet/airoha/airoha_ppe.c
+@@ -1060,7 +1060,7 @@
+ 	 * GDM netdev, or a DSA user port.
+ 	 */
+ 	egress = (struct net_device *)stack.path[1].dev;
+-	if (!egress) {
++	if (!egress || egress == skb->dev) {
+ 		rcu_read_unlock();
+ 		dev_put(master);
+ 		return false;

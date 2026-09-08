@@ -1,0 +1,76 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] net: pcs: airoha: bound ports and modes to mapped hardware
+
+AN7583 PCIe exposes one PCS MAC, backed by either the external PHY's
+SGMII/HSGMII bank or PCIe0's USXGMII bank. Only logical port zero has
+register maps. Reject the nonexistent second port and advertise only
+interfaces backed by the allocated maps, preventing configuration from
+dereferencing an absent bank. AN7581 PCIe retains both mapped ports.
+
+Keep the firmware index at its full width until range checking so large
+cell values cannot become negative or wrap into an otherwise valid port.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+
+--- a/drivers/net/pcs/airoha/pcs-airoha-common.c
++++ b/drivers/net/pcs/airoha/pcs-airoha-common.c
+@@ -1364,7 +1364,7 @@
+ {
+ 	struct airoha_pcs_priv *priv = data;
+ 	struct device *dev = priv->dev;
+-	int index = 0;
++	u64 index = 0;
+ 
+ 	switch (priv->data->port_type) {
+ 	case AIROHA_PCS_ETH:
+@@ -1390,7 +1390,7 @@
+ 
+ 	if (index >= priv->data->num_port)
+ 		return dev_err_ptr_probe(dev, -EINVAL,
+-					 "invalid PCS index %d\n", index);
++					 "invalid PCS index %llu\n", index);
+ 
+ 	return &priv->ports[index].pcs;
+ }
+@@ -1559,23 +1559,24 @@
+ 		port->pcs.poll = true;
+ 		port->pcs.ops = &airoha_pcs_ops;
+ 
+-		switch (data->port_type) {
+-		case AIROHA_PCS_ETH:
+-		case AIROHA_PCS_PON:
+-		case AIROHA_PCS_PCIE:
++		/* AN7583 PCIe exposes one of these register banks, selected
++		 * by the presence of its external PHY. Advertise only modes
++		 * backed by the register maps allocated for this port.
++		 */
++		if (priv->maps[index].usxgmii_pcs) {
+ 			__set_bit(PHY_INTERFACE_MODE_10GBASER,
+ 				  port->pcs.supported_interfaces);
+ 			__set_bit(PHY_INTERFACE_MODE_USXGMII,
+ 				  port->pcs.supported_interfaces);
+-			fallthrough;
+-		case AIROHA_PCS_USB:
++		}
++		if (priv->maps[index].hsgmii_an &&
++		    priv->maps[index].hsgmii_pcs) {
+ 			__set_bit(PHY_INTERFACE_MODE_SGMII,
+ 				  port->pcs.supported_interfaces);
+ 			__set_bit(PHY_INTERFACE_MODE_1000BASEX,
+ 				  port->pcs.supported_interfaces);
+ 			__set_bit(PHY_INTERFACE_MODE_2500BASEX,
+ 				  port->pcs.supported_interfaces);
+-			break;
+ 		}
+ 	}
+ 
+@@ -1660,7 +1661,7 @@
+ };
+ 
+ static const struct airoha_pcs_match_data an7583_pcs_pcie = {
+-	.num_port = 2,
++	.num_port = 1,
+ 	.port_type = AIROHA_PCS_PCIE,
+ 	.usxgmii_rx_gb_out_vld_tweak = true,
+ 	.usxgmii_xfi_mode_sel = true,

@@ -1,0 +1,144 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] net: airoha: serialize unresolved mailbox completions
+
+A fresh health-check payload cannot associate the shared DONE bit with
+that request. A timed-out producer can set DONE while the next producer
+has written its payload but has not completed, falsely acknowledging
+that request and potentially the following detach or address update.
+
+Keep one unresolved producer transaction across timeout and ambiguous
+doorbell errors. Do not publish another command until its DONE has been
+observed without changing the request registers. Drain that completion
+before either a health check or a core reboot; retain poisoned payload
+slots until the existing terminal DMA fence.
+
+Late completions still permit recovery. An unresolved mailbox now stays
+blocked instead of being reopened by an unproven health barrier or soft
+core reboot, and requires the existing verified terminal reset path.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+
+--- a/drivers/net/ethernet/airoha/airoha_npu.c
++++ b/drivers/net/ethernet/airoha/airoha_npu.c
+@@ -242,6 +242,13 @@
+ 		ret = -EAGAIN;
+ 		goto unlock;
+ 	}
++	/* The shared DONE bit cannot identify a new request while an older
++	 * producer transaction is unresolved, even with a fresh payload slot.
++	 */
++	if (core->mbox_pending) {
++		ret = -ETIMEDOUT;
++		goto unlock;
++	}
+ 	if (core->mbox_slot >= NPU_MBOX_NUM_SLOTS) {
+ 		ret = -EIO;
+ 		goto unlock;
+@@ -277,6 +284,7 @@
+ 		goto unlock;
+ 
+ 	/* A failed doorbell write is ambiguous: the device may have seen it. */
++	core->mbox_pending = true;
+ 	ret = regmap_write(npu->regmap, REG_CR_MBQ0_CTRL(2) + offset, val + 1);
+ 	if (ret)
+ 		goto uncertain;
+@@ -296,6 +304,8 @@
+ 		goto unlock;
+ 	}
+ 
++	/* No prior transaction was pending when this request was published. */
++	core->mbox_pending = false;
+ 	dma_rmb();
+ 	if (FIELD_GET(MBOX_MSG_STATUS, val) != NPU_MBOX_SUCCESS)
+ 		ret = -EINVAL;
+@@ -424,6 +434,41 @@
+ 	return IRQ_HANDLED;
+ }
+ 
++/* recovery_lock and recovering exclude new mailbox producers. Keep all
++ * request registers untouched until the previous producer acknowledges DONE.
++ * A core reboot or a response in another slot cannot prove that association.
++ */
++static int airoha_npu_mbox_drain(struct airoha_npu *npu)
++{
++	struct airoha_npu_core *core = &npu->cores[0];
++	int err = 0;
++	u32 val;
++
++	spin_lock_bh(&core->lock);
++	if (!core->mbox_pending)
++		goto unlock;
++
++	err = regmap_read_poll_timeout_atomic(npu->regmap, REG_CR_MBQ0_CTRL(3),
++					      val,
++					      atomic_read_acquire(&npu->stopped) ||
++					      (val & MBOX_MSG_DONE),
++					      100, 100 * USEC_PER_MSEC);
++	if (err)
++		goto unlock;
++	if (atomic_read_acquire(&npu->stopped)) {
++		err = -ESHUTDOWN;
++		goto unlock;
++	}
++
++	dma_rmb();
++	core->mbox_pending = false;
++	/* Keep the old payload slot poisoned until a terminal DMA fence. */
++unlock:
++	spin_unlock_bh(&core->lock);
++
++	return err;
++}
++
+ static int airoha_npu_mbox_health_check(struct airoha_npu *npu)
+ {
+ 	struct wlan_mbox_data *wlan_data;
+@@ -473,6 +518,10 @@
+ 		spin_lock_bh(&npu->cores[0].lock);
+ 		npu->cores[0].mbox_blocked = true;
+ 		spin_unlock_bh(&npu->cores[0].lock);
++		/* Do not reboot away an unresolved mailbox completion. */
++		err = airoha_npu_mbox_drain(npu);
++		if (err)
++			goto out;
+ 	}
+ 
+ 	err = regmap_read(npu->regmap, REG_CR_BOOT_CONFIG, &val);
+@@ -542,11 +591,12 @@
+ 	spin_lock_bh(&core->lock);
+ 	spin_unlock_bh(&core->lock);
+ 
+-	/* Treat a valid fresh-slot response as a liveness and ordering barrier
+-	 * for the FIFO mailbox producer. It is not a DMA fence: older poisoned
+-	 * slots remain quarantined until a verified terminal reset fences DMA.
++	/* First consume the sole unresolved completion without publishing a
++	 * new request. Only then can DONE belong to the health check below.
+ 	 */
+-	err = airoha_npu_mbox_health_check(npu);
++	err = airoha_npu_mbox_drain(npu);
++	if (!err)
++		err = airoha_npu_mbox_health_check(npu);
+ 	spin_lock_bh(&core->lock);
+ 	core->mbox_blocked = !!err;
+ 	spin_unlock_bh(&core->lock);
+--- a/include/linux/soc/airoha/airoha_offload.h
++++ b/include/linux/soc/airoha/airoha_offload.h
+@@ -197,6 +197,8 @@
+ 		unsigned long mbox_poisoned;
+ 		u8 mbox_slot;
+ 		bool mbox_blocked;
++		/* A doorbell was attempted and its DONE is still unresolved. */
++		bool mbox_pending;
+ 	} cores[NPU_NUM_CORES];
+ 
+ 	int irqs[NPU_NUM_IRQ];
+@@ -240,7 +242,7 @@
+  * fence; replay addresses for rings the consumer reset or reallocated.
+  */
+ int airoha_npu_recover(struct airoha_npu *npu);
+-/* Checks FIFO mailbox liveness/order without rebooting or fencing old DMA. */
++/* Drains the prior DONE before checking liveness; neither step fences DMA. */
+ int airoha_npu_recover_mailbox(struct airoha_npu *npu);
+ int airoha_npu_wait_recovery(struct airoha_npu *npu);
+ int airoha_npu_hard_stop(struct airoha_npu *npu);

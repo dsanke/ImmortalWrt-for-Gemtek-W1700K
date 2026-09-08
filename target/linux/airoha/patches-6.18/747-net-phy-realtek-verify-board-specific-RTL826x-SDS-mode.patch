@@ -1,0 +1,61 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] net: phy: realtek: verify board-specific RTL826x SDS mode
+
+Keep the upstream board property and RTK SerDes recovery sequence. Check
+that the host SDS mode survives the write, propagating read errors and
+rejecting mismatches instead of reporting a successfully configured PHY.
+The generic RTL826x patch already exposes the SDS accessor helpers.
+Document the existing optional property in the device tree binding.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+--- a/Documentation/devicetree/bindings/net/realtek,rtl82xx.yaml
++++ b/Documentation/devicetree/bindings/net/realtek,rtl82xx.yaml
+@@ -50,6 +50,13 @@
+     description:
+       Enable ALDPS mode, ALDPS mode default is disabled after hardware reset.
+ 
++  realtek,sds-mode:
++    $ref: /schemas/types.yaml#/definitions/uint32
++    maximum: 65535
++    description: |
++      Board-specific 16-bit host SerDes mode programmed into SDS page 6,
++      register 3 after the RTL825x/RTL826x firmware initialization sequence.
++
+   wakeup-source:
+     type: boolean
+     description:
+--- a/drivers/net/phy/realtek/realtek_main.c
++++ b/drivers/net/phy/realtek/realtek_main.c
+@@ -3269,7 +3269,7 @@
+ {
+ 	struct device *dev = &phydev->mdio.dev;
+ 	u32 mode;
+-	int ret;
++	int readback, ret;
+ 
+ 	if (!device_property_present(dev, "realtek,sds-mode"))
+ 		return 0;
+@@ -3290,6 +3290,22 @@
+ 	if (ret) {
+ 		phydev_err(phydev, "failed to set SDS mode 0x%04x: %d\n", mode, ret);
+ 		return ret;
++	}
++
++	readback = rtl826x_phy_patch_sds_get(phydev,
++					     RTL826X_SDS_HOST_MODE_PAGE,
++					     RTL826X_SDS_HOST_MODE_REG);
++	if (readback < 0) {
++		phydev_err(phydev, "failed to read back SDS mode: %d\n",
++			   readback);
++		return readback;
++	}
++
++	if (readback != mode) {
++		phydev_err(phydev,
++			   "SDS mode readback mismatch: wrote 0x%04x, read 0x%04x\n",
++			   mode, readback);
++		return -EIO;
+ 	}
+ 
+ 	phydev_info(phydev, "configured SDS mode 0x%04x\n", mode);

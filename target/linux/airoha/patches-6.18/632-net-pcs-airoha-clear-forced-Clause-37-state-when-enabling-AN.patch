@@ -1,0 +1,48 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] net: pcs: airoha: clear forced Clause 37 state when enabling AN
+
+For 1000BASE-X without an external PHY, phylink can toggle autonegotiation
+through pcs_config alone. The interface stays unchanged, so the initialized
+PCS avoids another analog bringup. Clear the two forced-mode bits when AN
+is enabled instead of retaining the preceding disabled-mode configuration.
+
+Program both requested states explicitly and propagate register failures,
+leaving the configuration uninitialized so a subsequent retry runs the
+full setup. Keep the existing register bank and ordinary advertisement
+fast path unchanged.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+--- a/drivers/net/pcs/airoha/pcs-airoha-common.c
++++ b/drivers/net/pcs/airoha/pcs-airoha-common.c
+@@ -750,13 +750,23 @@
+ 				AIROHA_PCS_HSGMII_PCS_MODE2_EN);
+ 	}
+ 
+-	if (interface == PHY_INTERFACE_MODE_1000BASEX &&
+-	    neg_mode != PHYLINK_PCS_NEG_INBAND_ENABLED) {
+-		regmap_set_bits(maps->hsgmii_pcs, AIROHA_PCS_HSGMII_PCS_CTROL_1,
+-				AIROHA_PCS_SGMII_SEND_AN_ERR_EN);
+-
+-		regmap_set_bits(maps->hsgmii_pcs, AIROHA_PCS_HSGMII_AN_SGMII_REG_AN_FORCE_CL37,
+-				AIROHA_PCS_HSGMII_AN_FORCE_AN_DONE);
++	if (interface == PHY_INTERFACE_MODE_1000BASEX) {
++		bool force = neg_mode != PHYLINK_PCS_NEG_INBAND_ENABLED;
++
++		/* AN can change without pre_config or another PCS reset. */
++		ret = regmap_update_bits(maps->hsgmii_pcs,
++					 AIROHA_PCS_HSGMII_PCS_CTROL_1,
++					 AIROHA_PCS_SGMII_SEND_AN_ERR_EN,
++					 force ? AIROHA_PCS_SGMII_SEND_AN_ERR_EN : 0);
++		if (ret)
++			return ret;
++
++		ret = regmap_update_bits(maps->hsgmii_pcs,
++					 AIROHA_PCS_HSGMII_AN_SGMII_REG_AN_FORCE_CL37,
++					 AIROHA_PCS_HSGMII_AN_FORCE_AN_DONE,
++					 force ? AIROHA_PCS_HSGMII_AN_FORCE_AN_DONE : 0);
++		if (ret)
++			return ret;
+ 	}
+ 
+ 	if (interface == PHY_INTERFACE_MODE_2500BASEX) {

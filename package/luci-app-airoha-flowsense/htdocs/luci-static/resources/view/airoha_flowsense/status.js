@@ -37,28 +37,56 @@ var themeCSS = '\
 .flowsense-dashboard h2{margin:0 0 14px;font-family:var(--airoha-font-ui);font-size:22px;line-height:1.3;font-weight:600;letter-spacing:0;color:var(--soc-text)}\
 .flowsense-dashboard .cbi-button,.flowsense-dashboard .cbi-input-select,.flowsense-dashboard input{font-family:var(--airoha-font-ui);font-size:13px!important;line-height:1.4;letter-spacing:0}\
 .flowsense-dashboard svg text{font-family:var(--airoha-font-mono)!important;letter-spacing:0!important;font-variant-numeric:tabular-nums}\
-.compass-wrap{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:center;gap:8px;padding:4px 0}\
-.eth-gauge-wrap{display:flex;flex-direction:row;gap:8px;flex-wrap:wrap;margin-top:8px}\
-.compass-gauge-wrap{width:100%;min-width:0;display:flex;justify-content:center;align-items:center}\
-.compass-gauge-wrap>svg{width:100%!important;max-width:none!important;display:block}\
-.compass-svg-wrap{width:100%;max-width:none}\
-.compass-cards{display:flex;flex-direction:row;gap:8px;flex-wrap:wrap;margin-top:12px;margin-bottom:4px}\
-.compass-card{background:var(--soc-card-bg);border:1px solid var(--soc-border);border-left:3px solid var(--compass-card-accent,var(--soc-border));border-radius:8px;padding:10px 14px;flex:1;min-width:140px;transition:border-color .3s}\
-.compass-card-title{font-size:11px;line-height:1.35;text-transform:uppercase;letter-spacing:0;color:var(--soc-muted);margin-bottom:4px;font-family:var(--airoha-font-ui);font-weight:600}\
-.compass-card-value{font-size:20px;font-weight:700;line-height:1.15;font-family:var(--airoha-font-mono);font-variant-numeric:tabular-nums}\
-.compass-card-sub{font-size:12px;line-height:1.4;color:var(--soc-muted);margin-top:3px}\
-.mode-status-grid{display:grid;grid-template-columns:minmax(210px,1.45fr) repeat(4,minmax(125px,1fr));gap:8px;margin-top:10px}\
-.mode-status-card{background:var(--soc-card-bg);border:1px solid var(--soc-border);border-left:3px solid var(--soc-border);border-radius:8px;padding:9px 14px;min-width:0;min-height:70px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;transition:border-color .3s}\
-.mode-status-card.mode-ap{border-left-color:#00c8ff}\
-.mode-status-card.mode-router{border-left-color:#00cc44}\
-.mode-status-card.mode-detecting{border-left-color:#b45309}\
-.mode-status-card.accel-on{border-left-color:#00cc44}\
-.mode-status-card.accel-off{border-left-color:#6b7280}\
-.mode-status-card .compass-card-title{line-height:1.25}\
-.mode-status-card .compass-card-value{font-size:18px;line-height:1.25}\
-.mode-status-card .compass-card-sub{line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\
-@media(max-width:1050px){.compass-wrap{grid-template-columns:repeat(3,minmax(0,1fr))}.mode-status-grid{grid-template-columns:repeat(3,minmax(150px,1fr))}}\
-@media(max-width:640px){.compass-wrap{grid-template-columns:repeat(2,minmax(0,1fr))}.mode-status-grid{grid-template-columns:repeat(2,minmax(140px,1fr))}.mode-status-card:first-child{grid-column:1/-1}}\
+.flowsense-dashboard{min-width:0}\
+.flowsense-panel{container-type:inline-size;container-name:flowsense;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;overflow:visible!important}\
+.fs-summary{display:grid;grid-template-columns:minmax(230px,1.4fr) repeat(4,minmax(120px,1fr));gap:10px;margin-bottom:12px}\
+.fs-primary,.fs-metric{background:var(--soc-card-bg);border:1px solid var(--soc-border);border-radius:8px;min-width:0}\
+.fs-primary{padding:14px 16px;border-left:4px solid var(--fs-accent);display:flex;flex-direction:column;justify-content:center}\
+.fs-primary-line{display:flex;align-items:center;gap:8px;margin-bottom:5px}\
+.fs-dot{width:9px;height:9px;border-radius:50%;background:var(--fs-accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--fs-accent) 16%,transparent);flex:0 0 auto}\
+.fs-eyebrow{font-size:11px;font-weight:700;color:var(--soc-muted);letter-spacing:0;text-transform:uppercase}\
+.fs-primary-value{font:700 25px/1.15 monospace;color:color-mix(in srgb,var(--fs-accent) 65%,var(--soc-accent-contrast));overflow-wrap:anywhere}\
+.fs-primary-sub,.fs-metric-sub{font-size:11px;color:var(--soc-muted);margin-top:4px;overflow-wrap:anywhere}\
+.fs-edit{align-self:flex-start;margin-top:7px;padding:2px 7px;border:1px solid var(--soc-border);border-radius:4px;background:transparent;color:var(--soc-text);font-size:10px;cursor:pointer}\
+.fs-edit:hover{border-color:var(--fs-accent);color:color-mix(in srgb,var(--fs-accent) 65%,var(--soc-accent-contrast))}\
+.fs-metric{padding:12px 14px;display:flex;flex-direction:column;justify-content:center}\
+.fs-metric-label{font-size:11px;font-weight:600;color:var(--soc-muted)}\
+.fs-metric-value{font:700 23px/1.2 monospace;color:var(--soc-text);margin-top:3px}\
+.fs-meter{height:5px;background:var(--soc-bar-track);border-radius:3px;overflow:hidden;margin-top:9px}\
+.fs-meter>span{display:block;height:100%;width:var(--fs-value);background:var(--fs-accent);border-radius:3px;transition:width .3s}\
+.fs-workspace{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:12px;align-items:start}\
+.fs-block{background:var(--soc-card-bg);border:1px solid var(--soc-border);border-radius:8px;min-width:0;overflow:hidden}\
+.fs-block-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--soc-border)}\
+.fs-block-title{font-size:14px;font-weight:700;color:var(--soc-text)}\
+.fs-block-meta{font-size:11px;color:var(--soc-muted);text-align:right}\
+.fs-band-row{display:grid;grid-template-columns:92px minmax(0,1fr) 182px;grid-template-areas:"identity main details";align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--soc-border);--fs-accent:#0ea5e9}\
+.fs-band-row:last-child,.fs-eth-row:last-child{border-bottom:0}\
+.fs-band-identity{grid-area:identity;min-width:0}\
+.fs-band-name,.fs-port-name{font-size:15px;font-weight:700;color:var(--soc-text)}\
+.fs-route,.fs-link-state{display:inline-flex;margin-top:4px;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;background:color-mix(in srgb,var(--fs-accent) 12%,transparent);color:color-mix(in srgb,var(--fs-accent) 65%,var(--soc-accent-contrast))}\
+.fs-band-main{grid-area:main;min-width:0}\
+.fs-reading-line{display:flex;align-items:baseline;gap:6px}\
+.fs-reading{font:700 25px/1 monospace;color:color-mix(in srgb,var(--fs-accent) 65%,var(--soc-accent-contrast))}\
+.fs-unit{font-size:10px;font-weight:600;color:var(--soc-muted)}\
+.fs-row-meter{height:6px;background:var(--soc-bar-track);border-radius:3px;overflow:hidden;margin-top:8px}\
+.fs-row-meter>span{display:block;height:100%;width:var(--fs-value);background:var(--fs-accent);border-radius:3px}\
+.fs-band-details{grid-area:details;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px}\
+.fs-detail-label{display:block;font-size:9px;color:var(--soc-muted);text-transform:uppercase}\
+.fs-detail-value{display:block;font:600 12px/1.35 monospace;color:var(--soc-text);white-space:nowrap}\
+.fs-eth-row{display:grid;grid-template-columns:92px minmax(0,1fr) 86px;grid-template-areas:"identity rates offload";align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--soc-border);--fs-accent:#10b981}\
+.fs-eth-identity{grid-area:identity}\
+.fs-link-speed{font:700 12px/1.2 monospace;color:color-mix(in srgb,var(--fs-accent) 65%,var(--soc-accent-contrast));margin-top:3px}\
+.fs-rate-grid{grid-area:rates;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}\
+.fs-rate-label{font-size:9px;font-weight:700;color:var(--soc-muted)}\
+.fs-rate-value{font:700 18px/1.2 monospace;color:var(--soc-text)}\
+.fs-eth-offload{grid-area:offload;text-align:right}\
+.fs-offload-count{font:700 15px/1.2 monospace;color:color-mix(in srgb,#0ea5e9 65%,var(--soc-accent-contrast))}\
+.fs-offload-label{font-size:9px;color:var(--soc-muted)}\
+.fs-state-strip{display:grid;grid-template-columns:minmax(160px,1.35fr) repeat(4,minmax(120px,1fr));gap:8px;margin:12px 0}\
+.fs-state-cell{background:var(--soc-card-bg);border:1px solid var(--soc-border);border-left:3px solid var(--fs-accent);border-radius:8px;padding:10px 12px;min-width:0}\
+.fs-state-title{font-size:10px;color:var(--soc-muted);overflow-wrap:anywhere}\
+.fs-state-value{font:700 15px/1.3 monospace;color:color-mix(in srgb,var(--fs-accent) 65%,var(--soc-accent-contrast));margin-top:3px;overflow-wrap:anywhere}\
+.fs-terminal-wrap{margin-top:12px}\
 .alert-wrap{margin-bottom:8px}\
 .alert-item{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border-radius:5px;margin-bottom:5px;font-size:13px}\
 .alert-warning{border-left:3px solid #f5a623;background:rgba(245,166,35,0.1)}\
@@ -67,12 +95,12 @@ var themeCSS = '\
 .alert-title{font-weight:600;margin-bottom:2px}\
 .alert-msg{font-size:12px;color:var(--soc-muted)}\
 @keyframes sqm-pulse{0%{opacity:0.2}50%{opacity:1}100%{opacity:0.2}}\
-.ppe-terminal{background:var(--soc-card-bg);border:1px solid var(--soc-border);border-left:3px solid #00c8ff;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;flex:1;min-width:220px;max-width:100%;box-sizing:border-box}\
+.ppe-terminal{background:var(--soc-card-bg);border:1px solid var(--soc-border);border-left:3px solid #00c8ff;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;flex:1;min-width:0;max-width:100%;box-sizing:border-box}\
 .ppe-terminal-bar{background:color-mix(in srgb,var(--soc-card-bg) 88%,var(--soc-border));padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--soc-border);flex-shrink:0}\
 .ppe-terminal-dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;background:#00c8ff;box-shadow:0 0 6px rgba(0,200,255,.45)}\
 .ppe-terminal-title{color:var(--soc-text);font-size:12px;line-height:1.4;font-weight:600;letter-spacing:0;font-family:var(--airoha-font-ui);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}\
 .ppe-pause-button{min-width:72px;flex:0 0 auto;padding:4px 12px!important}\
-.ppe-terminal-body{padding:10px 12px;overflow:auto;flex:1;min-width:0;width:100%;max-width:100%;min-height:200px;box-sizing:border-box;color:var(--soc-text)}\
+.ppe-terminal-body{padding:10px 12px;overflow:auto;flex:1;min-width:0;width:100%;max-width:100%;min-height:200px;max-height:320px;box-sizing:border-box;color:var(--soc-text)}\
 .ppe-flow-content{width:100%;min-width:0;font-family:var(--airoha-font-mono);font-size:12px;line-height:1.5;font-variant-numeric:tabular-nums}\
 .ppe-flow-section+.ppe-flow-section{margin-top:14px}\
 .ppe-flow-summary{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px}\
@@ -87,6 +115,11 @@ var themeCSS = '\
 .ppe-flow-more,.ppe-flow-empty{padding:6px}\
 .ppe-flow-footer{margin-top:12px}\
 @media(max-width:700px){.ppe-flow-table colgroup,.ppe-flow-table thead{display:none}.ppe-flow-table,.ppe-flow-table tbody{display:block;width:100%}.ppe-flow-table tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 10px;padding:8px 0;border-bottom:1px solid var(--soc-border)}.ppe-flow-table td{display:block;width:auto!important;min-width:0;padding:0;border:0}.ppe-flow-table td:before{content:attr(data-label);display:block;margin-bottom:2px;color:var(--soc-muted);font-size:10px;font-weight:600}.ppe-flow-table td.ppe-flow-wide{grid-column:1/-1}}\
+@container flowsense (max-width:1100px){.fs-summary{grid-template-columns:repeat(4,minmax(0,1fr))}.fs-primary{grid-column:1/-1}}\
+@container flowsense (max-width:900px){.fs-workspace{grid-template-columns:minmax(0,1fr)}.fs-state-strip{grid-template-columns:repeat(3,minmax(0,1fr))}.fs-state-cell:first-child{grid-column:span 2}}\
+@container flowsense (max-width:760px){.fs-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.fs-primary{grid-column:1/-1}.fs-state-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.fs-state-cell:first-child{grid-column:1/-1}}\
+@container flowsense (max-width:620px){.fs-band-row{grid-template-columns:minmax(0,1fr);grid-template-areas:"identity" "main" "details"}.fs-band-details{grid-template-columns:repeat(4,minmax(0,1fr))}.fs-eth-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"identity offload" "rates rates"}}\
+@container flowsense (max-width:420px){.fs-summary,.fs-state-strip{grid-template-columns:minmax(0,1fr)}.fs-primary,.fs-state-cell:first-child{grid-column:auto}.fs-band-details{grid-template-columns:repeat(2,minmax(0,1fr))}.fs-metric-value{font-size:21px}}\
 ';
 
 function isDarkMode() {
@@ -115,8 +148,8 @@ function injectCSS() {
 	if (dark === _lastDarkMode) return;
 	_lastDarkMode = dark;
 	var vars = dark
-		? ':root{--soc-card-bg:#1e1e1e;--soc-border:#333;--soc-muted:#999;--soc-text:#e0e0e0;--soc-bar-track:#333}'
-		: ':root{--soc-card-bg:#fff;--soc-border:#d0d0d0;--soc-muted:#666;--soc-text:#222;--soc-bar-track:#e0e0e0}';
+		? ':root{--soc-card-bg:#1e1e1e;--soc-border:#333;--soc-muted:#999;--soc-text:#e0e0e0;--soc-bar-track:#333;--soc-accent-contrast:#fff}'
+		: ':root{--soc-card-bg:#fff;--soc-border:#d0d0d0;--soc-muted:#666;--soc-text:#222;--soc-bar-track:#e0e0e0;--soc-accent-contrast:#000}';
 	el.textContent = themeCSS + vars;
 }
 
@@ -596,6 +629,9 @@ function renderConflictAlerts(alertData) {
 /* ── HW Buffer Health (replaces SQM — NPU traffic bypasses qdisc entirely) ── */
 function hwBufferState(fe, ppe, mode) {
 	fe = fe || {}; ppe = ppe || {}; mode = mode || 'router';
+	var available = fe.available !== false && !fe.error && Array.isArray(fe.pse_ports) &&
+		fe.cdm1 && typeof fe.cdm1.rx_hwf_drop === 'number' &&
+		fe.cdm2 && typeof fe.cdm2.rx_hwf_drop === 'number';
 
 	// PSE port drops: cumulative across all internal ports (0-9).
 	// These include CDM/PPE internal paths that drop normally — not a reliable
@@ -612,11 +648,13 @@ function hwBufferState(fe, ppe, mode) {
 	// Delta since last poll — null on first call (baseline only, no alarm)
 	var pseDelta    = (_prevPseDrops    !== null && pseDrops    >= _prevPseDrops)    ? (pseDrops    - _prevPseDrops)    : 0;
 	var cdmHwfDelta = (_prevCdmHwfDrops !== null && cdmHwfDrops >= _prevCdmHwfDrops) ? (cdmHwfDrops - _prevCdmHwfDrops) : 0;
-	_prevPseDrops    = pseDrops;
-	_prevCdmHwfDrops = cdmHwfDrops;
+	// Re-establish the baseline after a failed probe; missing counters
+	// must not look like zero drops or a burst when sampling resumes.
+	_prevPseDrops    = available ? pseDrops : null;
+	_prevCdmHwfDrops = available ? cdmHwfDrops : null;
 
 	// DROPPING on CDM HW-forwarding drops or very high PSE bursts (>200/poll).
-	var activeDrop = cdmHwfDelta > 0 || pseDelta > 200;
+	var activeDrop = !!available && (cdmHwfDelta > 0 || pseDelta > 200);
 
 	// PPE offload efficiency — BND/(BND+UNB). Shown in subtitle for info only.
 	// LOW OFFLOAD state removed: low BND% when idle is expected, not a problem.
@@ -625,8 +663,9 @@ function hwBufferState(fe, ppe, mode) {
 	var ppeTotal = ppeBound + ppeUnb;
 	var ppePct   = ppeTotal > 0 ? Math.round(ppeBound / ppeTotal * 100) : 0;
 
-	var color = activeDrop ? '#f5a623' : '#00cc44';
+	var color = !available ? '#888' : activeDrop ? '#f5a623' : '#00cc44';
 	return {
+		available: !!available,
 		pseDrops: pseDrops, cdmHwfDrops: cdmHwfDrops, pseDelta: pseDelta, cdmHwfDelta: cdmHwfDelta,
 		activeDrop: activeDrop,
 		ppeBound: ppeBound, ppeTotal: ppeTotal, ppePct: ppePct,
@@ -1383,6 +1422,8 @@ function updateCompassCards(cs, bypass, jitter, wan, wifi, bridge, mode) {
 function getModeReasonText(reason) {
 	var reasonMap = {
 		dhcp_disabled: _('DHCP disabled in UCI'),
+		active_wan: _('Active WAN detected'),
+		no_active_wan: _('No active WAN'),
 		no_wan: _('No WAN IP detected'),
 		local_gateway: _('Local gateway detected')
 	};
@@ -1448,6 +1489,279 @@ function updateModeStatusCards(dm, apo, flo, vo, ppo) {
 	});
 }
 
+/* ── Readable Operations Dashboard ── */
+var _pingTargetSaving = false;
+
+function attachPingTargetEditor(element, target) {
+	if (!element) return;
+	element.disabled = _pingTargetSaving;
+	element.title = _('Click to change ping target');
+	element.onclick = function() {
+		if (_pingTargetSaving) return;
+		var newTarget = window.prompt(_('Ping target IP or hostname:'), target);
+		if (!newTarget || newTarget === target) return;
+		_pingTargetSaving = true;
+		element.disabled = true;
+		callSetPingTarget(newTarget).then(function(res) {
+			if (res && res.success) {
+				ui.addNotification(null, E('p', {}, _('Ping target changed to: ') + res.target), 'info');
+			} else {
+				ui.addNotification(null, E('p', {}, res && res.error ? res.error : _('Failed to set ping target')), 'error');
+			}
+		}).catch(function(err) {
+			ui.addNotification(null, E('p', {}, _('Failed to set ping target') + ': ' + err.message), 'error');
+		}).then(function() {
+			_pingTargetSaving = false;
+			element.disabled = false;
+		});
+	};
+}
+
+function fsHasSelection(element) {
+	var selection = window.getSelection ? window.getSelection() : null;
+	if (!selection || selection.isCollapsed) return false;
+	for (var i = 0; i < selection.rangeCount; i++)
+		if (selection.getRangeAt(i).intersectsNode(element)) return true;
+	return false;
+}
+
+function fsClampPct(value) {
+	value = Number(value) || 0;
+	return Math.max(0, Math.min(100, value));
+}
+
+function fsStyle(accent, value) {
+	return '--fs-accent:' + accent + ';--fs-value:' + fsClampPct(value) + '%';
+}
+
+function fsFormatMbps(value) {
+	value = Math.max(0, Number(value) || 0);
+	if (value >= 1000) return (value / 1000).toFixed(value >= 10000 ? 1 : 2) + ' Gbps';
+	if (value >= 100) return value.toFixed(0) + ' Mbps';
+	if (value >= 10) return value.toFixed(1) + ' Mbps';
+	return value.toFixed(2) + ' Mbps';
+}
+
+function fsMetric(label, value, sub, accent, pct, extra) {
+	var children = [
+		E('div', { 'class': 'fs-metric-label' }, label),
+		E('div', { 'class': 'fs-metric-value' }, value),
+		E('div', { 'class': 'fs-metric-sub' }, sub)
+	];
+	if (pct !== null && pct !== undefined)
+		children.push(E('div', { 'class': 'fs-meter' }, E('span')));
+	if (extra) children.push(extra);
+	return E('div', { 'class': 'fs-metric', 'style': fsStyle(accent, pct || 0) }, children);
+}
+
+function fsSummary(st, ppe, dm, bypass, jitter, wan, hwBuf, cs) {
+	var bnd = (ppe.bnd || {}).total || 0;
+	var unb = (ppe.unb || {}).total || 0;
+	var total = bnd + unb;
+	var offloadPct = total > 0 ? Math.round(bnd / total * 100) : null;
+	var mode = dm.mode === 'ap' ? _('AP mode') : dm.mode === 'router' ? _('Router mode') : _('Detecting');
+	var npuValue = cs.npuActive ? _('Hardware accelerated') : cs.hwEnabled ? _('NPU idle') : _('CPU path');
+	var npuColor = cs.npuActive ? '#0ea5e9' : cs.hwEnabled ? '#64748b' : '#f97316';
+	var errors = (wan.rx_errors || 0) + (wan.tx_errors || 0);
+	var health = hwBuf.activeDrop ? _('Buffer drops detected') : errors > 0 ? errors + ' ' + _('link errors') : hwBuf.available ? _('No active drops') : _('NO DATA');
+	var freq = freqBarState(st.cpu_hw_freq, st.cpu_min_freq, st.cpu_max_freq,
+				 st.pll_freq_mhz, st.cpu_governor);
+	var freqMhz = freq.freq > 0 ? Math.round(freq.freq / 1000) : 0;
+	var latencyAvailable = jitter.available !== false && (jitter.last_ping || 0) > 0;
+	var latencyValue = latencyAvailable ? (jitter.last_ping || 0).toFixed(1) + ' ms' : 'N/A';
+	var latencyAccent = latencyAvailable ? latencyColor(jitter.last_ping || 0) : '#64748b';
+	var edit = E('button', { 'class': 'fs-edit', 'type': 'button' }, _('Edit target'));
+	attachPingTargetEditor(edit, jitter.target || '223.5.5.5');
+
+	return E('div', { 'class': 'fs-summary' }, [
+		E('div', { 'class': 'fs-primary', 'style': fsStyle(npuColor, 0) }, [
+			E('div', { 'class': 'fs-primary-line' }, [
+				E('span', { 'class': 'fs-dot' }),
+				E('span', { 'class': 'fs-eyebrow' }, _('NPU path'))
+			]),
+			E('div', { 'class': 'fs-primary-value' }, npuValue),
+			E('div', { 'class': 'fs-primary-sub' }, mode + ' / ' + health)
+		]),
+		fsMetric(_('CPU load'), (cs.cpuPct || 0) + '%',
+			freqMhz ? freqMhz + ' MHz / ' + (st.cpu_governor || _('unknown')) : _('Frequency unavailable'),
+			'#eab308', cs.cpuPct || 0),
+		fsMetric(_('PPE flows'), bnd + ' BND',
+			unb + ' UNB / ' + (offloadPct === null ? _('Idle') : offloadPct + '% ' + _('offloaded')),
+			'#0ea5e9', offloadPct),
+		fsMetric(_('WAN TX'), fsFormatMbps(bypass.wan_mbps || 0),
+			_('Current transmit throughput'), '#10b981', null),
+		fsMetric(_('Latency'), latencyValue,
+			latencyAvailable ? (jitter.jitter || 0).toFixed(1) + ' ms ' + _('jitter') : _('No samples'),
+			latencyAccent, null, edit)
+	]);
+}
+
+function fsDetail(label, value) {
+	return E('div', {}, [
+		E('span', { 'class': 'fs-detail-label' }, label),
+		E('span', { 'class': 'fs-detail-value' }, value)
+	]);
+}
+
+function fsWifiBandRow(band, wifi, ti, st, ppe) {
+	var bands = (wifi && Array.isArray(wifi.bands)) ? wifi.bands : [];
+	var ws = null;
+	for (var i = 0; i < bands.length; i++) if (bands[i].band === band) { ws = bands[i]; break; }
+	ws = ws || {};
+	var info = bandInfo[band] || { name: 'Band ' + band, maxMbps: 1000 };
+	var colors = ['#10b981', '#0ea5e9', '#8b5cf6'];
+	var accent = colors[band] || '#0ea5e9';
+	var retry = Number(ws.retry_pct) || 0;
+	var capacity = (Number(ws.avg_exp_throughput) || 0) * (100 - retry) / 100;
+	var maxScale = info.maxMbps || 1000;
+	var queue = ti.available === false ? null : getTxQueue(ti, band);
+	var bnd = (ppe.bnd && ppe.bnd.band_bnd) ? (ppe.bnd.band_bnd[band] || 0) : 0;
+	var unb = (ppe.unb && ppe.unb.band_unb) ? (ppe.unb.band_unb[band] || 0) : 0;
+	var signal = Number(ws.avg_signal) || 0;
+	var pct = maxScale > 0 ? capacity / maxScale * 100 : 0;
+
+	return E('div', { 'class': 'fs-band-row', 'style': fsStyle(accent, pct) }, [
+		E('div', { 'class': 'fs-band-identity' }, [
+			E('div', { 'class': 'fs-band-name' }, info.name),
+			E('span', { 'class': 'fs-route' }, queue ? String(queue.type || '?').toUpperCase() : _('NO DATA'))
+		]),
+		E('div', { 'class': 'fs-band-main' }, [
+			E('div', { 'class': 'fs-reading-line' }, [
+				E('span', { 'class': 'fs-reading' }, Math.round(capacity).toString()),
+				E('span', { 'class': 'fs-unit' }, _('Mbps effective capacity'))
+			]),
+			E('div', { 'class': 'fs-row-meter' }, E('span'))
+		]),
+		E('div', { 'class': 'fs-band-details' }, [
+			fsDetail(_('Clients'), (ws.stations || 0).toString()),
+			fsDetail(_('Signal'), signal ? signal + ' dBm' : 'N/A'),
+			fsDetail(_('Retry'), retry.toFixed(1) + '%'),
+			fsDetail(_('Flows'), bnd + ' BND / ' + unb + ' UNB')
+		])
+	]);
+}
+
+function fsWifiPanel(wifi, ti, st, ppe) {
+	var bands = (wifi && Array.isArray(wifi.bands)) ? wifi.bands : [];
+	var clients = 0;
+	for (var i = 0; i < bands.length; i++) clients += bands[i].stations || 0;
+	return E('section', { 'class': 'fs-block' }, [
+		E('div', { 'class': 'fs-block-head' }, [
+			E('div', { 'class': 'fs-block-title' }, _('Wi-Fi radios')),
+			E('div', { 'class': 'fs-block-meta' }, clients + ' ' + _('connected clients'))
+		]),
+		E('div', {}, [
+			fsWifiBandRow(0, wifi, ti, st, ppe),
+			fsWifiBandRow(1, wifi, ti, st, ppe),
+			fsWifiBandRow(2, wifi, ti, st, ppe)
+		])
+	]);
+}
+
+function fsSampleEthRates(ports) {
+	var rates = {};
+	var now = Date.now() / 1000;
+	(ports || []).forEach(function(port) {
+		var tx = Number(port.tx_bytes) || 0;
+		var rx = Number(port.rx_bytes) || 0;
+		var prev = _prevEthBytes[port.iface];
+		var txMbps = 0, rxMbps = 0;
+		if (prev && prev.time && now > prev.time) {
+			var dt = now - prev.time;
+			txMbps = Math.max(0, (tx - prev.tx) * 8 / dt / 1e6);
+			rxMbps = Math.max(0, (rx - prev.rx) * 8 / dt / 1e6);
+		}
+		_prevEthBytes[port.iface] = { tx: tx, rx: rx, time: now };
+		rates[port.iface] = { tx: txMbps, rx: rxMbps };
+	});
+	return rates;
+}
+
+function fsEthOffload(port, ppe) {
+	var iface = port.iface || '';
+	if (iface === 'wan') {
+		// PPE totals and Wi-Fi/LAN membership overlap; subtracting one
+		// from the other cannot identify flows traversing the WAN port.
+		return { available: false, bnd: 0, unb: 0 };
+	}
+	var idx = { lan1: 0, lan2: 1, lan3: 2, lan4: 3 }[iface];
+	return { available: true, bnd: (ppe.bnd && ppe.bnd.port_bnd && idx !== undefined) ? (ppe.bnd.port_bnd[idx] || 0) : 0, unb: 0 };
+}
+
+function fsRate(label, value, linkSpeed, accent) {
+	var pct = linkSpeed > 0 ? value / linkSpeed * 100 : 0;
+	return E('div', { 'style': fsStyle(accent, pct) }, [
+		E('div', { 'class': 'fs-rate-label' }, label),
+		E('div', { 'class': 'fs-rate-value' }, fsFormatMbps(value)),
+		E('div', { 'class': 'fs-row-meter' }, E('span'))
+	]);
+}
+
+function fsEthRow(port, rates, ppe) {
+	var iface = port.iface || '';
+	var up = !!port.up;
+	var speed = up ? (Number(port.speed) || 0) : 0;
+	var accent = up ? (iface === 'wan' ? '#0ea5e9' : '#10b981') : '#64748b';
+	var rate = rates[iface] || { tx: 0, rx: 0 };
+	var offload = fsEthOffload(port, ppe);
+	return E('div', { 'class': 'fs-eth-row', 'style': fsStyle(accent, 0) }, [
+		E('div', { 'class': 'fs-eth-identity' }, [
+			E('div', { 'class': 'fs-port-name' }, _ethLabel(iface)),
+			E('div', { 'class': 'fs-link-speed' }, up ? _ethSpeed(speed) : _('No link'))
+		]),
+		E('div', { 'class': 'fs-rate-grid' }, [
+			fsRate(_('TX'), rate.tx, speed, '#0ea5e9'),
+			fsRate(_('RX'), rate.rx, speed, '#f97316')
+		]),
+		E('div', { 'class': 'fs-eth-offload' }, [
+			E('div', { 'class': 'fs-offload-count' }, offload.available ? offload.bnd.toString() : 'N/A'),
+			E('div', { 'class': 'fs-offload-label' }, offload.available ? _('BND flows') : _('WAN flow attribution unavailable'))
+		])
+	]);
+}
+
+function fsEthernetPanel(ports, rates, ppe) {
+	var linked = 0;
+	(ports || []).forEach(function(port) { if (port.up) linked++; });
+	return E('section', { 'class': 'fs-block' }, [
+		E('div', { 'class': 'fs-block-head' }, [
+			E('div', { 'class': 'fs-block-title' }, _('Ethernet ports')),
+			E('div', { 'class': 'fs-block-meta' }, linked + '/' + (ports || []).length + ' ' + _('links up'))
+		]),
+		E('div', {}, (ports || []).map(function(port) { return fsEthRow(port, rates, ppe); }))
+	]);
+}
+
+function fsStateStrip(dm, apo, flo, vo, ppo) {
+	return E('div', { 'class': 'fs-state-strip' }, modeStatusData(dm, apo, flo, vo, ppo).map(function(card) {
+		return E('div', { 'class': 'fs-state-cell', 'style': '--fs-accent:' + card.color }, [
+			E('div', { 'class': 'fs-state-title' }, card.title),
+			E('div', { 'class': 'fs-state-value' }, card.value),
+			card.sub ? E('div', { 'class': 'fs-metric-sub' }, card.sub) : null
+		]);
+	}));
+}
+
+function fsTerminal(ppe, pauseButton) {
+	return E('div', { 'class': 'fs-terminal-wrap' }, renderPpeTerminal(ppe, pauseButton));
+}
+
+function fsDashboard(st, ppe, ti, fe, dm, bypass, wan, jitter, wifi, bridge,
+			     flo, ppo, apo, vo, eth, rates) {
+	var mode = dm.mode || 'router';
+	var hwBuf = hwBufferState(fe, ppe, mode);
+	var cs = compassState(bypass, hwBuf, jitter, wan, wifi, bridge, mode);
+	var ports = (eth && Array.isArray(eth.ports)) ? eth.ports : [];
+	return E('div', { 'class': 'fs-live-layout' }, [
+		fsSummary(st, ppe, dm, bypass, jitter, wan, hwBuf, cs),
+		E('div', { 'class': 'fs-workspace' }, [
+			fsWifiPanel(wifi, ti, st, ppe),
+			fsEthernetPanel(ports, rates, ppe)
+		]),
+		fsStateStrip(dm, apo, flo, vo, ppo)
+	]);
+}
+
 /* ── Main View ── */
 return view.extend({
 	load: function() {
@@ -1459,22 +1773,30 @@ return view.extend({
 		data = data || [];
 		injectCSS();
 		var st=data[0]||{}, ppe=data[1]||{}, ti=data[2]||{}, fe=data[3]||{};
-		var vo=data[4]||{}, txs=data[5]||{}, dm=data[6]||{};
+		var vo=data[4]||{}, dm=data[6]||{};
 		var bypass=data[7]||{}, wan=data[8]||{};
 		var jitter=data[9]||{}, alertData=data[10]||{};
 		var wifi=data[11]||{}, bridge=data[12]||{};
 		var flo=data[13]||{}, ppo=data[14]||{}, apo=data[15]||{};
 		var eth=data[16]||{};
-		var memR = Array.isArray(st.memory_regions) ? st.memory_regions : [];
-		var mode = dm.mode || 'router';
 		var ppeTablePaused = false;
 		var latestPpe = ppe;
 
 		function updatePpeTerminal(ppeSnapshot) {
-			var body = document.getElementById('ppe-terminal-body');
-			if (!body) return;
-			body.innerHTML = '';
+			var body = terminal.querySelector('#ppe-terminal-body');
+			if (!body || fsHasSelection(body)) return;
+			var scrollTop = body.scrollTop;
+			var scrollLeft = body.scrollLeft;
+			var tableScrolls = Array.prototype.map.call(body.querySelectorAll('.ppe-flow-table-wrap'), function(wrap) {
+				return wrap.scrollLeft;
+			});
+			while (body.firstChild) body.removeChild(body.firstChild);
 			body.appendChild(renderPpeTerminalBody(ppeSnapshot));
+			body.scrollTop = scrollTop;
+			body.scrollLeft = scrollLeft;
+			Array.prototype.forEach.call(body.querySelectorAll('.ppe-flow-table-wrap'), function(wrap, i) {
+				wrap.scrollLeft = tableScrolls[i] || 0;
+			});
 		}
 
 		var ppePauseButton = E('button', {
@@ -1495,40 +1817,29 @@ return view.extend({
 			}
 		}, _('Pause'));
 
-		var hwBuf = hwBufferState(fe, ppe, mode);
-		var cs = compassState(bypass, hwBuf, jitter, wan, wifi, bridge, mode);
-
-		// Compass SVG container — tachometer is embedded inside (innerHTML so we can update by element ID)
-		var compassSvgWrap = E('div', { 'class': 'compass-svg-wrap compass-gauge-wrap', 'id': 'compass-svg-wrap' });
-		compassSvgWrap.innerHTML = buildCompassSVG(cs, mode, ppe);
-
-		var cnWrap = E('div', { 'id': 'cpu-npu-svg-wrap', 'class': 'compass-gauge-wrap' });
-		cnWrap.innerHTML = buildCpuNpuCompassSVG(cs, ppe, st, ti);
+		var ethPorts = (eth && Array.isArray(eth.ports)) ? eth.ports : [];
+		var ethRates = fsSampleEthRates(ethPorts);
+		var live = E('div', { 'id': 'flowsense-live' }, [
+			fsDashboard(st, ppe, ti, fe, dm, bypass, wan, jitter, wifi, bridge,
+				    flo, ppo, apo, vo, eth, ethRates)
+		]);
+		var terminal = fsTerminal(ppe, ppePauseButton);
+		var fetchError = E('div', { 'class': 'alert-wrap', 'role': 'status' });
 
 		var view = E('div',{'class':'cbi-map flowsense-dashboard'},[
 			E('h2',{},_('Airoha FlowSense')),
-
-			// Conflict alerts
+			fetchError,
 			renderConflictAlerts(alertData),
-
-			// Offload Monitor
-			E('div',{'class':'cbi-section'},[
-				// Gauges: CPU/NPU tachometer, compass, WiFi tachometers, compass cards, mode banner
-				E('div', { 'class': 'compass-wrap' }, [
-					cnWrap,
-					compassSvgWrap
-				].concat(buildWifiTachoElements(wifi, ti, st, ppe))),
-				renderCompassCards(cs, bypass, jitter, wan, wifi, bridge, mode),
-				// Ethernet port gauges row
-				buildEthGaugeRow((eth && Array.isArray(eth.ports)) ? eth.ports : [], ppe),
-				renderModeStatusCards(dm, apo, flo, vo, ppo),
-				E('div',{'style':'margin-top:12px'}, renderPpeTerminal(ppe, ppePauseButton))
-			]),
+			E('div',{'class':'cbi-section flowsense-panel'},[ live, terminal ]),
 		]);
 
 		// Data fetch + DOM update function — called immediately and via poll
+		var pendingFetch = null;
 		var fetchData = L.bind(function() {
-			return callGetOverview().then(L.bind(function(overview) {
+			// The initial fetch can still be running when the first poll fires.
+			if (pendingFetch) return pendingFetch;
+			pendingFetch = callGetOverview().then(L.bind(function(overview) {
+				fetchError.textContent = '';
 				overview = overview || {};
 				var d = [
 					overview.status, overview.ppe, overview.token, overview.frame,
@@ -1539,65 +1850,49 @@ return view.extend({
 				];
 				injectCSS();
 				var st=d[0]||{}, ppe=d[1]||{}, ti=d[2]||{}, fe=d[3]||{};
-				var vo=d[4]||{}, txs=d[5]||{}, dm=d[6]||{};
+				var vo=d[4]||{}, dm=d[6]||{};
 				var bypass=d[7]||{}, wan=d[8]||{};
 				var jitter=d[9]||{}, alertData=d[10]||{};
 				var wifi=d[11]||{}, bridge=d[12]||{};
 				var flo=d[13]||{}, ppo=d[14]||{}, apo=d[15]||{};
 				var eth=d[16]||{};
-				var mode = dm.mode || 'router';
 				latestPpe = ppe;
-
-				// Compass update (tachometer embedded inside compass)
-				var hwBuf = hwBufferState(fe, ppe, mode);
-				var cs = compassState(bypass, hwBuf, jitter, wan, wifi, bridge, mode);
-				updateCompassSVG(cs, mode, ppe);
-				updateCompassCards(cs, bypass, jitter, wan, wifi, bridge, mode);
-
-				// CPU/NPU Load compass update
-				updateCpuNpuCompassSVG(cs, ppe, st, ti);
-
-				// WiFi band tachometers
-				var wbands = (wifi && Array.isArray(wifi.bands)) ? wifi.bands : [];
-				var wFallback = st.npu_loaded ? 'npu' : 'dma';
-				for (var wb = 0; wb < 3; wb++) {
-					var wws = null;
-					for (var wj = 0; wj < wbands.length; wj++) if (wbands[wj].band === wb) { wws = wbands[wj]; break; }
-					updateWifiBandSVG(wb, wws, (getTxQueue(ti, wb) || { type: wFallback }).type, ppe);
-				}
-
-				// Conflict alerts
-				var alertWrap = document.getElementById('conflict-alerts');
+				var alertWrap = view.querySelector('#conflict-alerts');
 				if (alertWrap) {
 					var fresh = renderConflictAlerts(alertData);
-					alertWrap.innerHTML = fresh.innerHTML;
+					alertWrap.parentNode.replaceChild(fresh, alertWrap);
 				}
 
-				// Mode and acceleration cards
-				updateModeStatusCards(dm, apo, flo, vo, ppo);
-
-				// Ethernet port gauges — compute per-port Mbps deltas from cumulative byte counters
 				var ethPorts = (eth && Array.isArray(eth.ports)) ? eth.ports : [];
-				var now = Date.now() / 1000;
-				ethPorts.forEach(function(p) {
-					var prev = _prevEthBytes[p.iface];
-					var txMbps = 0, rxMbps = 0;
-					if (prev && prev.time) {
-						var dt = now - prev.time;
-						if (dt > 0) {
-							txMbps = Math.max(0, (p.tx_bytes - prev.tx) * 8 / dt / 1e6);
-							rxMbps = Math.max(0, (p.rx_bytes - prev.rx) * 8 / dt / 1e6);
+				var ethRates = fsSampleEthRates(ethPorts);
+				if (live) {
+					var active = document.activeElement;
+					var tag = active && active.tagName;
+					var activeInLive = !!(active && live.contains(active));
+					var editing = activeInLive &&
+						(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || active.isContentEditable);
+					var restoreEditFocus = activeInLive && active.classList && active.classList.contains('fs-edit');
+					if (!editing && !_pingTargetSaving && !fsHasSelection(live)) {
+						var dashboard = fsDashboard(st, ppe, ti, fe, dm, bypass, wan, jitter,
+							wifi, bridge, flo, ppo, apo, vo, eth, ethRates);
+						while (live.firstChild) live.removeChild(live.firstChild);
+						live.appendChild(dashboard);
+						if (restoreEditFocus) {
+							var newEdit = live.querySelector('.fs-edit');
+							if (newEdit) {
+								try { newEdit.focus({ preventScroll: true }); }
+								catch (e) { newEdit.focus(); }
+							}
 						}
 					}
-					_prevEthBytes[p.iface] = { tx: p.tx_bytes, rx: p.rx_bytes, time: now };
-					if (!_maxEthMbps[p.iface] || txMbps > _maxEthMbps[p.iface]) _maxEthMbps[p.iface] = Math.max(txMbps, 100);
-					if (rxMbps > _maxEthMbps[p.iface]) _maxEthMbps[p.iface] = rxMbps;
-					updateEthPortSVG(p, txMbps, rxMbps, ppe);
-				});
-
-				// PPE terminal
+				}
 				if (!ppeTablePaused) updatePpeTerminal(latestPpe);
-			},this));
+			},this)).catch(function() {
+				fetchError.textContent = _('Unable to refresh FlowSense. Retrying automatically.');
+			}).then(function() {
+				pendingFetch = null;
+			});
+			return pendingFetch;
 		}, this);
 
 		// Fetch data immediately (page shows with defaults, then updates)

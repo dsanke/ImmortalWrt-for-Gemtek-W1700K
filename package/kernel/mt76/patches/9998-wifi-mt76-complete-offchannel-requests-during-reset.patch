@@ -1,0 +1,44 @@
+From: OpenAI Codex <noreply@openai.com>
+Subject: [PATCH] wifi: mt76: complete off-channel requests during reset
+
+Clearing an active scan or remain-on-channel request without notifying
+mac80211 leaves its request active after L1 recovery. A later cancellation
+cannot complete it because the driver's request has already been cleared.
+Full restart also requires the hardware scan completion before reconfig.
+
+Keep the MCU_RESET guards around hardware channel restoration, but always
+notify mac80211 when the corresponding active request is completed. The
+request pointers and existing mutex prevent duplicate completions.
+
+Signed-off-by: OpenAI Codex <noreply@openai.com>
+---
+ channel.c | 3 +--
+ scan.c    | 3 +--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/channel.c b/channel.c
+--- a/channel.c
++++ b/channel.c
+@@ -336,8 +336,7 @@ void mt76_roc_complete(struct mt76_phy *phy)
+ 	mt76_put_vif_phy_link(phy, phy->roc_vif, phy->roc_link);
+ 	phy->roc_vif = NULL;
+ 	phy->roc_link = NULL;
+-	if (!test_bit(MT76_MCU_RESET, &dev->phy.state))
+-		ieee80211_remain_on_channel_expired(phy->hw);
++	ieee80211_remain_on_channel_expired(phy->hw);
+ }
+ 
+ void mt76_roc_complete_work(struct work_struct *work)
+diff --git a/scan.c b/scan.c
+--- a/scan.c
++++ b/scan.c
+@@ -39,8 +39,7 @@ static void mt76_scan_complete(struct mt76_dev *dev, bool abort)
+ 	}
+ 	mt76_put_vif_phy_link(phy, dev->scan.vif, dev->scan.mlink);
+ 	memset(&dev->scan, 0, sizeof(dev->scan));
+-	if (!test_bit(MT76_MCU_RESET, &dev->phy.state))
+-		ieee80211_scan_completed(phy->hw, &info);
++	ieee80211_scan_completed(phy->hw, &info);
+ }
+ 
+ void mt76_abort_scan(struct mt76_dev *dev)

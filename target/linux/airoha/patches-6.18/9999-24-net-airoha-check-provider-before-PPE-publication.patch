@@ -1,0 +1,58 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] net: airoha: validate NPU before publishing PPE entries
+
+Reject a missing or stopped provider before changing the shared entry.
+Previously the DRAM ownership word was published before returning the
+provider error, and the SRAM shadow was also modified on rejected calls.
+
+Prepare statistics routing in a local entry so the payload is complete
+before publishing ib1. This does not define recovery from SRAM ACK errors
+or claim a persistent hardware fence while NPU firmware remains live.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+
+--- a/drivers/net/ethernet/airoha/airoha_ppe.c
++++ b/drivers/net/ethernet/airoha/airoha_ppe.c
+@@ -782,17 +782,11 @@
+ {
+ 	u32 sram_num_entries = airoha_ppe_get_total_sram_num_entries(ppe);
+ 	struct airoha_foe_entry *hwe = ppe->foe + hash * sizeof(*hwe);
+-	u32 ts = airoha_ppe_get_timestamp(ppe);
+ 	struct airoha_eth *eth = ppe->eth;
++	struct airoha_foe_entry entry;
+ 	struct airoha_npu *npu;
+ 	int err = 0;
+-
+-	memcpy(&hwe->d, &e->d, sizeof(*hwe) - sizeof(hwe->ib1));
+-	wmb();
+-
+-	e->ib1 &= ~AIROHA_FOE_IB1_BIND_TIMESTAMP;
+-	e->ib1 |= FIELD_PREP(AIROHA_FOE_IB1_BIND_TIMESTAMP, ts);
+-	hwe->ib1 = e->ib1;
++	u32 ts;
+ 
+ 	rcu_read_lock();
+ 
+@@ -802,8 +796,20 @@
+ 		goto unlock;
+ 	}
+ 
++	ts = airoha_ppe_get_timestamp(ppe);
++	e->ib1 &= ~AIROHA_FOE_IB1_BIND_TIMESTAMP;
++	e->ib1 |= FIELD_PREP(AIROHA_FOE_IB1_BIND_TIMESTAMP, ts);
++	memcpy(&entry, e, sizeof(entry));
++
+ 	if (!rx_wlan)
+-		airoha_ppe_foe_flow_stats_update(ppe, npu, hwe, hash);
++		airoha_ppe_foe_flow_stats_update(ppe, npu, &entry, hash);
++
++	/* Prepare the complete payload before publishing the ownership word.
++	 * A rejected provider must not modify either SRAM shadow or DRAM.
++	 */
++	memcpy(&hwe->d, &entry.d, sizeof(*hwe) - sizeof(hwe->ib1));
++	wmb();
++	WRITE_ONCE(hwe->ib1, entry.ib1);
+ 
+ 	if (hash < sram_num_entries)
+ 		err = airoha_ppe_foe_commit_sram_entry(ppe, hash);

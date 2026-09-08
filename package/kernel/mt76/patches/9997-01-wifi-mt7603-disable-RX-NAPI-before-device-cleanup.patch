@@ -1,0 +1,33 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] wifi: mt7603: disable RX NAPI before device cleanup
+
+The current netif_napi_del() contract requires a disabled NAPI instance.
+MT7603 stops its watchdog through ieee80211_unregister_hw(), but never
+disables RX NAPI in successful device removal. Disable registered RX
+instances after the final MCU exchange and before shared DMA cleanup.
+
+The watchdog always restores NAPI, and its containing mac_work has been
+cancelled by the mac80211 stop callback before this point. Probe failure
+does not call this successful-unregister path.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+diff --git a/mt7603/init.c b/mt7603/init.c
+--- a/mt7603/init.c
++++ b/mt7603/init.c
+@@ -563,9 +563,15 @@
+ 
+ void mt7603_unregister_device(struct mt7603_dev *dev)
+ {
++	int i;
++
+ 	tasklet_disable(&dev->mt76.pre_tbtt_tasklet);
+ 	mt76_unregister_device(&dev->mt76);
+ 	mt7603_mcu_exit(dev);
++	for (i = 0; i < __MT_RXQ_MAX; i++) {
++		if (test_bit(i, &dev->mt76.napi_registered))
++			napi_disable(&dev->mt76.napi[i]);
++	}
+ 	mt7603_dma_cleanup(dev);
+ 	mt76_free_device(&dev->mt76);
+ }

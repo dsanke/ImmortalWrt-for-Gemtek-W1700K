@@ -1,0 +1,125 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] net: airoha: drain PPE callbacks before table teardown
+
+Allow rule destruction during netdev unregister while refusing new work.
+Serialize table lifetime with callback admission, drain debugfs before any
+FE reset and reclaim orphaned software rules without post-reset MMIO.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+
+--- a/drivers/net/ethernet/airoha/airoha_ppe.c
++++ b/drivers/net/ethernet/airoha/airoha_ppe.c
+@@ -1865,22 +1865,36 @@
+ {
+ 	struct airoha_ppe *ppe = dev->priv;
+ 	struct airoha_eth *eth = ppe->eth;
++	struct flow_cls_offload *f = type_data;
+ 	int err = 0;
+ 
+-	/* Netfilter flowtable can try to offload flower rules while not all
+-	 * the net_devices are registered or initialized. Delay offloading
+-	 * until all net_devices are registered in the system.
++	mutex_lock(&flow_offload_mutex);
++
++	/* The table lifetime and callback admission use the same lock. */
++	if (!test_bit(DEV_STATE_PPE_INITIALIZED, &eth->state)) {
++		err = -ESHUTDOWN;
++		goto unlock;
++	}
++
++	/* Unregister replays destroy callbacks after registration is closed.
++	 * Removing an existing rule must not initialize or restart the NPU.
+ 	 */
+-	if (!test_bit(DEV_STATE_REGISTERED, &eth->state))
+-		return -EBUSY;
+-
+-	mutex_lock(&flow_offload_mutex);
++	if (f->command == FLOW_CLS_DESTROY) {
++		err = airoha_ppe_flow_offload_destroy(eth, f);
++		goto unlock;
++	}
++
++	if (!test_bit(DEV_STATE_REGISTERED, &eth->state) ||
++	    test_bit(DEV_STATE_REMOVING, &eth->state)) {
++		err = -EBUSY;
++		goto unlock;
++	}
+ 
+ 	if (!eth->npu)
+ 		err = airoha_ppe_offload_setup(eth);
+ 	if (!err)
+-		err = airoha_ppe_flow_offload_cmd(eth, type_data);
+-
++		err = airoha_ppe_flow_offload_cmd(eth, f);
++unlock:
+ 	mutex_unlock(&flow_offload_mutex);
+ 
+ 	return err;
+@@ -1892,6 +1906,10 @@
+ 	struct airoha_ppe *ppe = dev->priv;
+ 	u32 ppe_hash_mask = airoha_ppe_get_total_num_entries(ppe) - 1;
+ 	u16 now, diff;
++
++	if (!test_bit(DEV_STATE_PPE_INITIALIZED, &ppe->eth->state) ||
++	    test_bit(DEV_STATE_REMOVING, &ppe->eth->state))
++		return;
+ 
+ 	if (hash > ppe_hash_mask)
+ 		return;
+@@ -2077,6 +2095,24 @@
+ 	return err;
+ }
+ 
++/* All callback and packet producers are drained before table destruction.
++ * Free orphaned software rules without touching fenced hardware.
++ */
++static void airoha_ppe_free_flow(void *ptr, void *arg)
++{
++	struct airoha_flow_table_entry *e = ptr;
++
++	if (e->type == FLOW_TYPE_L2) {
++		struct airoha_flow_table_entry *subflow;
++		struct hlist_node *n;
++
++		hlist_for_each_entry_safe(subflow, n, &e->l2_flows,
++					 l2_subflow_node)
++			kfree(subflow);
++	}
++	kfree(e);
++}
++
+ bool airoha_ppe_deinit(struct airoha_eth *eth)
+ {
+ 	struct airoha_ppe *ppe = eth->ppe;
+@@ -2084,9 +2120,12 @@
+ 	bool quiesced;
+ 	int err;
+ 
++	/* debugfs_remove() drains in-flight reads before any FE reset. */
++	debugfs_remove(ppe->debugfs_dir);
++	ppe->debugfs_dir = NULL;
++
++	mutex_lock(&flow_offload_mutex);
+ 	clear_bit(DEV_STATE_PPE_INITIALIZED, &eth->state);
+-
+-	mutex_lock(&flow_offload_mutex);
+ 
+ 	npu = rcu_replace_pointer(eth->npu, NULL,
+ 				  lockdep_is_held(&flow_offload_mutex));
+@@ -2115,11 +2154,11 @@
+ 		}
+ 	}
+ 
++	rhashtable_destroy(&ppe->l2_flows);
++	rhashtable_free_and_destroy(&eth->flow_table, airoha_ppe_free_flow,
++				   NULL);
++
+ 	mutex_unlock(&flow_offload_mutex);
+-
+-	rhashtable_destroy(&eth->ppe->l2_flows);
+-	rhashtable_destroy(&eth->flow_table);
+-	debugfs_remove(eth->ppe->debugfs_dir);
+ 
+ 	quiesced = READ_ONCE(ppe->dma_quiesced);
+ 	return quiesced;

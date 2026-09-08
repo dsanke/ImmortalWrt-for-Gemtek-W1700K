@@ -6,6 +6,9 @@
 
 TARGET="${1:-223.5.5.5}"
 RESULT_FILE="/tmp/npu-jitter.json"
+RESULT_TMP="${RESULT_FILE}.$$"
+trap 'rm -f "$RESULT_TMP"' EXIT
+trap 'exit 0' INT TERM
 WINDOW=10
 INTERVAL=2  # seconds between pings
 
@@ -42,12 +45,13 @@ while true; do
 				jitter, last, c, "'"$TARGET"'"
 		}')
 
-		echo "$result" > "$RESULT_FILE"
 	else
 		# Unreachable — preserve sample count but mark unreachable
-		printf '{"jitter":0,"last_ping":0,"samples":%d,"target":"%s","reachable":false,"available":true}\n' \
-			"$count" "$TARGET" > "$RESULT_FILE"
+		result=$(printf '{"jitter":0,"last_ping":0,"samples":%d,"target":"%s","reachable":false,"available":true}' \
+			"$count" "$TARGET")
 	fi
 
+	# Publish only complete JSON; readers keep the previous sample until rename.
+	printf '%s\n' "$result" > "$RESULT_TMP" && mv -f "$RESULT_TMP" "$RESULT_FILE"
 	sleep "$INTERVAL"
 done

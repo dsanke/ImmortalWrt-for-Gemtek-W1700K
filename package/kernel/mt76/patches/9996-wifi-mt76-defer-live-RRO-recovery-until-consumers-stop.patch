@@ -1,0 +1,35 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] wifi: mt76: defer live RRO recovery until consumers stop
+
+RRO session release runs while Wi-Fi packet producers and DMA remain
+active. Do not reboot the NPU inline when a fresh-slot mailbox health
+check fails: software recovery does not establish a consumer DMA fence.
+
+Propagate the health-check error to the existing RRO worker. It retains
+session ownership and schedules full Wi-Fi recovery, which stops the
+consumers before rebooting the NPU and replaying its configuration.
+Keep the no-reboot mailbox health-check retry when it succeeds.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+diff --git a/npu.c b/npu.c
+index fadd40d..74ebec9 100644
+--- a/npu.c
++++ b/npu.c
+@@ -516,13 +516,10 @@
+ 	if (err == -EAGAIN)
+ 		err = airoha_npu_wait_recovery(npu);
+ 	else if (err == -ETIMEDOUT) {
++		/* A live RRO release must leave a failed mailbox recovery to
++		 * the caller, which stops consumers before rebooting the NPU.
++		 */
+ 		err = airoha_npu_recover_mailbox(npu);
+-		if (err) {
+-			dev_warn(dev->dev,
+-				 "NPU mailbox health check failed: %d; forcing recovery\n",
+-				 err);
+-			err = airoha_npu_recover(npu);
+-		}
+ 	}
+ 
+ 	if (retry && !err)

@@ -1,0 +1,84 @@
+From: OpenAI Codex <noreply@openai.com>
+Subject: [PATCH] wifi: mt7996: gate MCU timeout recovery admission
+
+An initial firmware timeout must unwind probe synchronously instead of
+starting reset work against uninitialized RRO memory and PHY state. During
+a full reset, the existing retry loop owns MCU errors; requeueing reset
+work would restart that loop after its terminal failure path returned.
+
+Keep aborting pending MCU transactions in either case, but admit new reset
+work only after initialization and outside an existing full reset. Publish
+initial readiness after coredump allocation, before scheduling async init,
+so watchdog work cannot dereference an unallocated crash buffer. Use
+release/acquire publication for readiness so IRQ and MCU readers observe
+the initialized state on weakly ordered systems.
+
+Signed-off-by: OpenAI Codex <noreply@openai.com>
+---
+diff --git a/mt7996/init.c b/mt7996/init.c
+--- a/mt7996/init.c
++++ b/mt7996/init.c
+@@ -1920,10 +1920,6 @@
+ 	mt7996_for_each_phy(dev, phy)
+ 		mt7996_thermal_init(phy);
+ 
+-	ieee80211_queue_work(mt76_hw(dev), &dev->init_work);
+-
+-	dev->recovery.hw_init_done = true;
+-
+ 	ret = mt7996_init_debugfs(dev);
+ 	if (ret)
+ 		goto error;
+@@ -1931,6 +1927,9 @@
+ 	ret = mt7996_coredump_register(dev);
+ 	if (ret)
+ 		goto error;
++
++	smp_store_release(&dev->recovery.hw_init_done, true);
++	ieee80211_queue_work(mt76_hw(dev), &dev->init_work);
+ 
+ 	return 0;
+ 
+diff --git a/mt7996/mac.c b/mt7996/mac.c
+--- a/mt7996/mac.c
++++ b/mt7996/mac.c
+@@ -2895,7 +2895,7 @@
+ 	if (READ_ONCE(dev->terminal))
+ 		return;
+ 
+-	if (!dev->recovery.hw_init_done)
++	if (!smp_load_acquire(&dev->recovery.hw_init_done))
+ 		return;
+ 
+ 	if (dev->recovery.hw_full_reset)
+diff --git a/mt7996/mcu.c b/mt7996/mcu.c
+--- a/mt7996/mcu.c
++++ b/mt7996/mcu.c
+@@ -232,8 +232,13 @@
+ 			return -ESHUTDOWN;
+ 
+ 		if (!test_and_set_bit(MT76_MCU_RESET, &dev->mphy.state)) {
++			wake_up(&dev->mt76.mcu.wait);
++			/* Probe unwinds synchronously; full reset owns its retries. */
++			if (!smp_load_acquire(&dev->recovery.hw_init_done) ||
++			    dev->recovery.hw_full_reset)
++				return -ETIMEDOUT;
++
+ 			dev->recovery.restart = true;
+-			wake_up(&dev->mt76.mcu.wait);
+ 			queue_work(dev->mt76.wq, &dev->reset_work);
+ 			wake_up(&dev->reset_wait);
+ 		}
+diff --git a/mt7996/mt7996.h b/mt7996/mt7996.h
+--- a/mt7996/mt7996.h
++++ b/mt7996/mt7996.h
+@@ -501,8 +501,8 @@
+ 		u32 state;
+ 		u32 wa_reset_count;
+ 		u32 wm_reset_count;
++		bool hw_init_done;
+ 		bool hw_full_reset:1;
+-		bool hw_init_done:1;
+ 		bool restart:1;
+ 		bool npu_reset:1;
+ 	} recovery;

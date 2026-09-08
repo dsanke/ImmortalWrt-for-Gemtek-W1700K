@@ -1,0 +1,193 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] net: airoha: require TC authorization for bridge offload
+
+Do not bind arbitrary bridge traffic from an RX-side FDB lookup. A forward
+path resolves the destination but does not evaluate bridge isolation, STP
+or packet filters, and these speculative entries have no rule teardown.
+
+Retain L2 subflows backed by explicit TC rules and normal routed offload.
+Plain bridge traffic without an offload rule stays on the software path.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+
+--- a/drivers/net/ethernet/airoha/airoha_ppe.c
++++ b/drivers/net/ethernet/airoha/airoha_ppe.c
+@@ -923,22 +923,6 @@
+ 	return 0;
+ }
+ 
+-static bool
+-airoha_ppe_foe_prepare_bridge_subflow_dev(struct airoha_ppe *ppe,
+-					  struct net_device *dev,
+-					  struct airoha_flow_data *data,
+-					  struct airoha_foe_entry *hwe)
+-{
+-	int err;
+-
+-	err = airoha_ppe_foe_entry_prepare(ppe->eth, hwe, dev,
+-					   PPE_PKT_TYPE_BRIDGE, data, 0, 0);
+-	if (err)
+-		return false;
+-
+-	return true;
+-}
+-
+ static struct net_device *
+ airoha_ppe_foe_get_bridge_master_rcu(struct net_device *dev)
+ {
+@@ -967,117 +951,6 @@
+ 		return master;
+ 
+ 	return NULL;
+-}
+-
+-static struct net_device *
+-airoha_ppe_foe_get_bridge_master(struct net_device *dev)
+-{
+-	struct net_device *master;
+-
+-	rcu_read_lock();
+-	master = airoha_ppe_foe_get_bridge_master_rcu(dev);
+-	if (master)
+-		dev_hold(master);
+-	rcu_read_unlock();
+-
+-	return master;
+-}
+-
+-static bool
+-airoha_ppe_foe_prepare_bridge_subflow(struct airoha_ppe *ppe,
+-				      struct sk_buff *skb,
+-				      struct airoha_foe_entry *hwe)
+-{
+-	struct net_device_path_stack stack;
+-	struct net_device_path_ctx ctx = {};
+-	struct ethhdr *eh = eth_hdr(skb);
+-	struct vlan_ethhdr *veh;
+-	struct airoha_flow_data data = {};
+-	struct net_device *master, *egress;
+-	u16 vid, proto;
+-	int err, i;
+-
+-	if (!is_valid_ether_addr(eh->h_source) ||
+-	    !is_valid_ether_addr(eh->h_dest))
+-		return false;
+-
+-	ether_addr_copy(data.eth.h_dest, eh->h_dest);
+-	ether_addr_copy(data.eth.h_source, eh->h_source);
+-
+-	if (!skb->dev)
+-		return false;
+-
+-	/* Resolve the FDB in the packet's VLAN. A trunk port PVID describes
+-	 * untagged traffic only and must not replace an skb hardware VLAN tag.
+-	 */
+-	master = airoha_ppe_foe_get_bridge_master(skb->dev);
+-	if (!master)
+-		return false;
+-
+-	rcu_read_lock();
+-	ctx.dev = master;
+-	if (is_vlan_dev(skb->dev)) {
+-		vid = vlan_dev_vlan_id(skb->dev);
+-		if (vid) {
+-			ctx.vlan[0].id = vid;
+-			ctx.vlan[0].proto = vlan_dev_vlan_proto(skb->dev);
+-			ctx.num_vlans = 1;
+-		}
+-	} else if (skb_vlan_tag_present(skb)) {
+-		ctx.vlan[0].id = skb_vlan_tag_get_id(skb);
+-		ctx.vlan[0].proto = skb->vlan_proto;
+-		ctx.num_vlans = 1;
+-	} else if (eth_type_vlan(eh->h_proto) &&
+-		   (u8 *)eh + VLAN_ETH_HLEN <= skb_tail_pointer(skb)) {
+-		veh = (struct vlan_ethhdr *)eh;
+-		vid = ntohs(veh->h_vlan_TCI) & VLAN_VID_MASK;
+-		if (vid) {
+-			ctx.vlan[0].id = vid;
+-			ctx.vlan[0].proto = veh->h_vlan_proto;
+-			ctx.num_vlans = 1;
+-		}
+-	} else if (br_vlan_enabled(master) &&
+-		   netif_is_bridge_port(skb->dev) &&
+-		   !br_vlan_get_pvid_rcu(skb->dev, &vid) && vid &&
+-		   !br_vlan_get_proto(master, &proto)) {
+-		ctx.vlan[0].id = vid;
+-		ctx.vlan[0].proto = htons(proto);
+-		ctx.num_vlans = 1;
+-	}
+-
+-	err = __dev_fill_forward_path(&ctx, eh->h_dest, &stack);
+-	if (err || stack.num_paths < 2 ||
+-	    stack.path[0].type != DEV_PATH_BRIDGE) {
+-		rcu_read_unlock();
+-		dev_put(master);
+-		return false;
+-	}
+-
+-	data.vlan.num = ctx.num_vlans;
+-	for (i = 0; i < ctx.num_vlans; i++) {
+-		data.vlan.hdr[i].id = ctx.vlan[i].id;
+-		data.vlan.hdr[i].proto = ctx.vlan[i].proto;
+-	}
+-
+-	/* The path immediately below the bridge is the real egress port. It
+-	 * can be an AP netdev (resolved to WDMA by entry_prepare), a direct
+-	 * GDM netdev, or a DSA user port.
+-	 */
+-	egress = (struct net_device *)stack.path[1].dev;
+-	if (!egress || egress == skb->dev) {
+-		rcu_read_unlock();
+-		dev_put(master);
+-		return false;
+-	}
+-	dev_hold(egress);
+-	rcu_read_unlock();
+-
+-	dev_put(master);
+-	err = airoha_ppe_foe_prepare_bridge_subflow_dev(ppe, egress, &data,
+-							hwe);
+-	dev_put(egress);
+-
+-	return err;
+ }
+ 
+ static bool airoha_ppe_foe_skb_is_local(const struct sk_buff *skb)
+@@ -1110,19 +983,13 @@
+ 					struct sk_buff *skb,
+ 					u32 hash, bool rx_wlan)
+ {
+-	struct airoha_foe_entry bridge_hwe = {};
+ 	struct airoha_flow_table_entry *e;
+ 	struct airoha_foe_bridge br = {};
+ 	struct airoha_foe_entry *hwe;
+ 	bool commit_done = false;
+-	bool bridge_ready = false;
+ 	bool local = airoha_ppe_foe_skb_is_local(skb);
+ 	struct hlist_node *n;
+ 	u32 index, state;
+-
+-	if (!local)
+-		bridge_ready = airoha_ppe_foe_prepare_bridge_subflow(ppe, skb,
+-							     &bridge_hwe);
+ 
+ 	spin_lock_bh(&ppe_lock);
+ 
+@@ -1159,13 +1026,14 @@
+ 	if (local)
+ 		goto unlock;
+ 
++	/* Only an explicit TC offload rule authorizes a bridge subflow.
++	 * An FDB lookup alone cannot enforce bridge isolation, STP or filters.
++	 */
+ 	airoha_ppe_foe_set_bridge_addrs(&br, eth_hdr(skb));
+ 	e = rhashtable_lookup_fast(&ppe->l2_flows, &br,
+ 				   airoha_l2_flow_table_params);
+ 	if (e)
+ 		airoha_ppe_foe_commit_subflow_entry(ppe, e, hash, rx_wlan);
+-	else if (bridge_ready)
+-		airoha_ppe_foe_commit_subflow(ppe, &bridge_hwe, hash, rx_wlan);
+ unlock:
+ 	spin_unlock_bh(&ppe_lock);
+ }

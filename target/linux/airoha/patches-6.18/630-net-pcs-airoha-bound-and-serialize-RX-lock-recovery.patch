@@ -1,0 +1,762 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] net: pcs: airoha: bound and serialize RX-lock recovery
+
+Port the RX diagnostic and recovery changes onto the current PCS stack,
+keeping the SDK crossing-search calibration, TX FIR override and current
+PHY bringup sequence. Retain the existing USXGMII speed replay and reject
+unsupported XFI speeds instead of programming uninitialized values.
+
+Report register failures and local receiver loss as link down. Serialize
+CDR recovery with both configuration callbacks and explicit AN restarts,
+and track the selected interface per port. Allow two recovery resets one
+second apart, then hold a 30-second cooldown. Observe for one second again
+after expiry; partial receiver lock must not discard the cooldown. Require
+one second of signal loss before starting a new recovery epoch.
+
+Leave pause configuration to pcs_config instead of unconditionally
+enabling it in post_config. This keeps the pause policy independent of
+callback ordering; the current phylink calls post_config first.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+--- a/drivers/net/pcs/airoha/pcs-airoha-common.c
++++ b/drivers/net/pcs/airoha/pcs-airoha-common.c
+@@ -403,16 +403,76 @@
+ 					 struct phylink_link_state *state)
+ {
+ 	const struct airoha_pcs_match_data *data = priv->data;
++	struct airoha_pcs_rxlock_recovery *recovery = NULL;
+ 	struct airoha_pcs_maps *maps = &priv->maps[index];
+-	u32 an_done, lpa;
+-
+-	/* Trigger HW workaround if needed. If an error is reported,
+-	 * consider link down and test again later.
++	u32 an_done = 0, lpa = 0;
++	int ret;
++
++	if (data->rxlock_workaround) {
++		recovery = &priv->ports[index].rxlock;
++		mutex_lock(&recovery->lock);
++		if (recovery->state == AIROHA_PCS_RXLOCK_RECONFIGURING ||
++		    recovery->state == AIROHA_PCS_RXLOCK_CONFIG_FAILED)
++			goto error;
++	}
++
++	/* Toggle AN Status */
++	ret = regmap_set_bits(maps->usxgmii_pcs,
++			      AIROHA_PCS_USXGMII_PCS_AN_CONTROL_6,
++			      AIROHA_PCS_USXGMII_TOG_PCS_AUTONEG_STS);
++	if (ret)
++		goto error;
++	ret = regmap_clear_bits(maps->usxgmii_pcs,
++				AIROHA_PCS_USXGMII_PCS_AN_CONTROL_6,
++				AIROHA_PCS_USXGMII_TOG_PCS_AUTONEG_STS);
++	if (ret)
++		goto error;
++
++	ret = regmap_read(maps->usxgmii_pcs,
++			  AIROHA_PCS_USXGMII_PCS_AN_STATS_0, &lpa);
++	if (ret)
++		goto error;
++	ret = regmap_read(maps->usxgmii_pcs,
++			  AIROHA_PCS_USXGMII_PCS_AN_STATS_2, &an_done);
++	if (ret)
++		goto error;
++
++	state->link = !!(lpa & MDIO_USXGMII_LINK);
++	state->an_complete = !!(an_done & AIROHA_PCS_USXGMII_PCS_AN_COMPLETE);
++
++	phylink_decode_usxgmii_word(state, lpa);
++
++	/* Sample AN before recovery so an in-progress negotiation with a
++	 * locked receiver is never interrupted by a CDR reset.
+ 	 */
+-	if (data->rxlock_workaround && data->rxlock_workaround(priv, index)) {
+-		state->link = false;
+-		return;
+-	}
++	if (data->rxlock_workaround) {
++		ret = data->rxlock_workaround(priv, index,
++					  state->link,
++					  state->an_complete);
++		if (ret)
++			goto error;
++	}
++	if (recovery)
++		mutex_unlock(&recovery->lock);
++
++	if (data->rxlock_workaround && !state->link)
++		dev_dbg_ratelimited(priv->dev,
++				    "port %d USXGMII AN down: stats0=%#010x stats2=%#010x\n",
++				     index, lpa, an_done);
++	return;
++
++error:
++	state->link = false;
++	state->an_complete = false;
++	if (recovery)
++		mutex_unlock(&recovery->lock);
++}
++
++static void airoha_pcs_get_state_10gbaser(struct airoha_pcs_priv *priv, int index,
++					  struct phylink_link_state *state)
++{
++	struct airoha_pcs_maps *maps = &priv->maps[index];
++	u32 status, curr_mode;
+ 
+ 	/* Toggle AN Status */
+ 	regmap_set_bits(maps->usxgmii_pcs, AIROHA_PCS_USXGMII_PCS_AN_CONTROL_6,
+@@ -420,27 +480,6 @@
+ 	regmap_clear_bits(maps->usxgmii_pcs, AIROHA_PCS_USXGMII_PCS_AN_CONTROL_6,
+ 			  AIROHA_PCS_USXGMII_TOG_PCS_AUTONEG_STS);
+ 
+-	regmap_read(maps->usxgmii_pcs, AIROHA_PCS_USXGMII_PCS_AN_STATS_0, &lpa);
+-	regmap_read(maps->usxgmii_pcs, AIROHA_PCS_USXGMII_PCS_AN_STATS_2, &an_done);
+-
+-	state->link = !!(lpa & MDIO_USXGMII_LINK);
+-	state->an_complete = !!(an_done & AIROHA_PCS_USXGMII_PCS_AN_COMPLETE);
+-
+-	phylink_decode_usxgmii_word(state, lpa);
+-}
+-
+-static void airoha_pcs_get_state_10gbaser(struct airoha_pcs_priv *priv, int index,
+-					  struct phylink_link_state *state)
+-{
+-	struct airoha_pcs_maps *maps = &priv->maps[index];
+-	u32 status, curr_mode;
+-
+-	/* Toggle AN Status */
+-	regmap_set_bits(maps->usxgmii_pcs, AIROHA_PCS_USXGMII_PCS_AN_CONTROL_6,
+-			AIROHA_PCS_USXGMII_TOG_PCS_AUTONEG_STS);
+-	regmap_clear_bits(maps->usxgmii_pcs, AIROHA_PCS_USXGMII_PCS_AN_CONTROL_6,
+-			  AIROHA_PCS_USXGMII_TOG_PCS_AUTONEG_STS);
+-
+ 	regmap_read(maps->usxgmii_pcs, AIROHA_PCS_USXGMII_BASE_R_10GB_T_PCS_STUS_1,
+ 		    &status);
+ 	regmap_read(maps->usxgmii_pcs, AIROHA_PCS_USXGMII_PCS_AN_STATS_0, &curr_mode);
+@@ -491,10 +530,11 @@
+ 	}
+ }
+ 
+-static int airoha_pcs_config(struct phylink_pcs *pcs, unsigned int neg_mode,
+-			     phy_interface_t interface,
+-			     const unsigned long *advertising,
+-			     bool permit_pause_to_mac)
++static int __airoha_pcs_config(struct phylink_pcs *pcs,
++			       unsigned int neg_mode,
++			       phy_interface_t interface,
++			       const unsigned long *advertising,
++			       bool permit_pause_to_mac)
+ {
+ 	struct airoha_pcs_port *port = to_airoha_pcs_port(pcs);
+ 	struct airoha_pcs_priv *priv = port->priv;
+@@ -505,7 +545,7 @@
+ 	int ret;
+ 
+ 	maps = &priv->maps[port->index];
+-	priv->interface = interface;
++	port->interface = interface;
+ 	data = priv->data;
+ 
+ 	/* Apply Analog and Digital configuration for PCS */
+@@ -707,15 +747,77 @@
+ 	return 0;
+ }
+ 
+-static void airoha_pcs_an_restart(struct phylink_pcs *pcs)
++static void __airoha_pcs_an_restart(struct airoha_pcs_port *port);
++
++static int airoha_pcs_config(struct phylink_pcs *pcs, unsigned int neg_mode,
++			     phy_interface_t interface,
++			     const unsigned long *advertising,
++			     bool permit_pause_to_mac)
+ {
+ 	struct airoha_pcs_port *port = to_airoha_pcs_port(pcs);
++	const struct airoha_pcs_match_data *data = port->priv->data;
++	struct airoha_pcs_rxlock_recovery *recovery = &port->rxlock;
++	bool major_config, restart_pending = false;
++	int ret;
++
++	if (!data->rxlock_workaround)
++		return __airoha_pcs_config(pcs, neg_mode, interface, advertising,
++					   permit_pause_to_mac);
++
++	mutex_lock(&recovery->lock);
++	major_config = recovery->config_pending;
++	if (!major_config) {
++		recovery->state = AIROHA_PCS_RXLOCK_RECONFIGURING;
++		recovery->deadline = 0;
++		recovery->signal_loss_deadline = 0;
++		recovery->attempts = 0;
++		recovery->signal_loss_pending = false;
++		recovery->signal_lost = false;
++		recovery->pcs_config_done = false;
++		recovery->pcs_config_restart = false;
++		recovery->post_config_done = false;
++		recovery->an_restart_pending = false;
++	}
++
++	ret = __airoha_pcs_config(pcs, neg_mode, interface, advertising,
++				  permit_pause_to_mac);
++	if (ret < 0) {
++		recovery->state = AIROHA_PCS_RXLOCK_CONFIG_FAILED;
++		recovery->deadline = 0;
++		recovery->config_pending = false;
++		recovery->pcs_config_done = false;
++		recovery->pcs_config_restart = false;
++		recovery->post_config_done = false;
++		recovery->an_restart_pending = false;
++	} else if (major_config) {
++		recovery->pcs_config_done = true;
++		recovery->pcs_config_restart = ret > 0;
++		if (recovery->post_config_done) {
++			/* A positive return makes phylink restart AN after this
++			 * callback, which also satisfies a queued restart request.
++			 */
++			restart_pending = recovery->an_restart_pending &&
++					  !recovery->pcs_config_restart;
++			airoha_pcs_rxlock_rearm(recovery);
++		}
++	} else {
++		airoha_pcs_rxlock_rearm(recovery);
++	}
++	if (restart_pending)
++		__airoha_pcs_an_restart(port);
++	mutex_unlock(&recovery->lock);
++
++	return ret;
++}
++
++static void __airoha_pcs_an_restart(struct airoha_pcs_port *port)
++{
+ 	struct airoha_pcs_priv *priv = port->priv;
+ 	struct airoha_pcs_maps *maps;
+ 
+ 	maps = &priv->maps[port->index];
+ 
+-	switch (priv->interface) {
++	switch (port->interface) {
+ 	case PHY_INTERFACE_MODE_SGMII:
+ 	case PHY_INTERFACE_MODE_1000BASEX:
+ 	case PHY_INTERFACE_MODE_2500BASEX:
+@@ -731,9 +833,29 @@
+ 		udelay(3);
+ 		regmap_clear_bits(maps->usxgmii_pcs, AIROHA_PCS_USXGMII_PCS_AN_CONTROL_0,
+ 				  AIROHA_PCS_USXGMII_AN_RESTART);
++		break;
+ 	default:
++		break;
++	}
++}
++
++static void airoha_pcs_an_restart(struct phylink_pcs *pcs)
++{
++	struct airoha_pcs_port *port = to_airoha_pcs_port(pcs);
++	struct airoha_pcs_rxlock_recovery *recovery;
++
++	if (!port->priv->data->rxlock_workaround) {
++		__airoha_pcs_an_restart(port);
+ 		return;
+ 	}
++
++	recovery = &port->rxlock;
++	mutex_lock(&recovery->lock);
++	if (recovery->state == AIROHA_PCS_RXLOCK_RECONFIGURING)
++		recovery->an_restart_pending = true;
++	else if (recovery->state != AIROHA_PCS_RXLOCK_CONFIG_FAILED)
++		__airoha_pcs_an_restart(port);
++	mutex_unlock(&recovery->lock);
+ }
+ 
+ static void airoha_pcs_link_up(struct phylink_pcs *pcs, unsigned int neg_mode,
+@@ -765,7 +887,8 @@
+ 	}
+ 
+ 	if (interface == PHY_INTERFACE_MODE_USXGMII ||
+-	    interface == PHY_INTERFACE_MODE_10GBASER) {
++	    (interface == PHY_INTERFACE_MODE_10GBASER &&
++	     neg_mode != PHYLINK_PCS_NEG_INBAND_ENABLED)) {
+ 		u32 mode;
+ 		u32 rate_adapt;
+ 
+@@ -790,6 +913,11 @@
+ 			rate_adapt = AIROHA_PCS_HSGMII_RATE_ADPT_FORCE_RATE_ADAPT_MODE_100;
+ 			mode = AIROHA_PCS_USXGMII_MODE_100;
+ 			break;
++		default:
++			dev_err_ratelimited(priv->dev,
++					    "port %d unsupported XFI speed %d\n",
++					    port->index, speed);
++			return;
+ 		}
+ 
+ 		regmap_update_bits(maps->usxgmii_pcs,
+@@ -914,9 +1042,18 @@
+ {
+ 	struct airoha_pcs_port *port = to_airoha_pcs_port(pcs);
+ 	struct airoha_pcs_priv *priv = port->priv;
++	struct airoha_pcs_rxlock_recovery *recovery;
+ 	struct airoha_pcs_maps *maps;
+ 
+ 	maps = &priv->maps[port->index];
++	if (priv->data->rxlock_workaround) {
++		recovery = &port->rxlock;
++		mutex_lock(&recovery->lock);
++		airoha_pcs_rxlock_rearm(recovery);
++		recovery->state = AIROHA_PCS_RXLOCK_RECONFIGURING;
++		recovery->config_pending = true;
++		mutex_unlock(&recovery->lock);
++	}
+ 
+ 	/* Select HSGMII or USXGMII in SCU regs */
+ 	airoha_pcs_setup_scu(priv, port->index, interface);
+@@ -946,9 +1083,14 @@
+ {
+ 	struct airoha_pcs_port *port = to_airoha_pcs_port(pcs);
+ 	struct airoha_pcs_priv *priv = port->priv;
++	struct airoha_pcs_rxlock_recovery *recovery = NULL;
+ 	struct airoha_pcs_maps *maps;
+ 
+ 	maps = &priv->maps[port->index];
++	if (priv->data->rxlock_workaround) {
++		recovery = &port->rxlock;
++		mutex_lock(&recovery->lock);
++	}
+ 
+ 	/* Frag disable */
+ 	regmap_update_bits(maps->pcs_mac, AIROHA_PCS_XFI_MAC_XFI_GIB_CFG,
+@@ -963,11 +1105,21 @@
+ 			   AIROHA_PCS_XFI_IPG_NUM,
+ 			   FIELD_PREP(AIROHA_PCS_XFI_IPG_NUM, 10));
+ 
+-	/* Enable TX/RX flow control */
+-	regmap_set_bits(maps->pcs_mac, AIROHA_PCS_XFI_MAC_XFI_GIB_CFG,
+-			AIROHA_PCS_XFI_TX_FC_EN);
+-	regmap_set_bits(maps->pcs_mac, AIROHA_PCS_XFI_MAC_XFI_GIB_CFG,
+-			AIROHA_PCS_XFI_RX_FC_EN);
++	if (recovery) {
++		if (recovery->config_pending) {
++			recovery->post_config_done = true;
++			if (recovery->pcs_config_done) {
++				bool restart_pending =
++					recovery->an_restart_pending &&
++					!recovery->pcs_config_restart;
++
++				airoha_pcs_rxlock_rearm(recovery);
++				if (restart_pending)
++					__airoha_pcs_an_restart(port);
++			}
++		}
++		mutex_unlock(&recovery->lock);
++	}
+ 
+ 	return 0;
+ }
+@@ -1339,6 +1491,8 @@
+ 
+ 		port->priv = priv;
+ 		port->index = index;
++		mutex_init(&port->rxlock.lock);
++		port->rxlock.state = AIROHA_PCS_RXLOCK_IDLE;
+ 		port->pcs.poll = true;
+ 		port->pcs.ops = &airoha_pcs_ops;
+ 
+--- a/drivers/net/pcs/airoha/pcs-airoha.h
++++ b/drivers/net/pcs/airoha/pcs-airoha.h
+@@ -5,6 +5,7 @@
+  */
+ 
+ #include <linux/bitfield.h>
++#include <linux/mutex.h>
+ #include <linux/phylink.h>
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+@@ -1648,7 +1649,6 @@
+ struct airoha_pcs_priv {
+ 	struct device *dev;
+ 	const struct airoha_pcs_match_data *data;
+-	phy_interface_t interface;
+ 
+ 	struct airoha_pcs_port *ports;
+ 
+@@ -1662,6 +1662,8 @@
+ 
+ 	struct reset_control *xfi_rst;
+ 	struct reset_control_bulk_data rsts[AIROHA_PCS_MAX_NUM_RSTS];
++
++	u32 rxlock_reset_count[2];
+ 
+ 	struct phy *phy;
+ 
+@@ -1670,9 +1672,55 @@
+ 	struct airoha_pcs_tx_fir tx_fir;
+ };
+ 
++enum airoha_pcs_rxlock_state {
++	AIROHA_PCS_RXLOCK_IDLE,
++	AIROHA_PCS_RXLOCK_RECONFIGURING,
++	AIROHA_PCS_RXLOCK_CONFIG_FAILED,
++	AIROHA_PCS_RXLOCK_OBSERVE,
++	AIROHA_PCS_RXLOCK_RESETTING,
++	AIROHA_PCS_RXLOCK_SETTLING,
++	AIROHA_PCS_RXLOCK_AN_WAIT,
++	AIROHA_PCS_RXLOCK_EXHAUSTED,
++};
++
++struct airoha_pcs_rxlock_recovery {
++	/* Serializes state transitions and CDR resets. */
++	struct mutex lock;
++	enum airoha_pcs_rxlock_state state;
++	unsigned long deadline;
++	unsigned long signal_loss_deadline;
++	u8 attempts;
++	bool signal_loss_pending;
++	bool signal_lost;
++	/* Keep recovery gated until both major-config callbacks complete. */
++	bool config_pending;
++	bool pcs_config_done;
++	bool pcs_config_restart;
++	bool post_config_done;
++	bool an_restart_pending;
++};
++
++static inline void
++airoha_pcs_rxlock_rearm(struct airoha_pcs_rxlock_recovery *recovery)
++{
++	recovery->state = AIROHA_PCS_RXLOCK_IDLE;
++	recovery->deadline = 0;
++	recovery->signal_loss_deadline = 0;
++	recovery->attempts = 0;
++	recovery->signal_loss_pending = false;
++	recovery->signal_lost = false;
++	recovery->config_pending = false;
++	recovery->pcs_config_done = false;
++	recovery->pcs_config_restart = false;
++	recovery->post_config_done = false;
++	recovery->an_restart_pending = false;
++}
++
+ struct airoha_pcs_port {
+ 	struct airoha_pcs_priv *priv;
+ 	int index;
++	phy_interface_t interface;
++	struct airoha_pcs_rxlock_recovery rxlock;
+ 
+ 	struct phylink_pcs pcs;
+ };
+@@ -1690,7 +1738,8 @@
+ 	int (*bringup)(struct airoha_pcs_priv *priv,
+ 		       int index, phy_interface_t interface);
+ 	void (*link_up)(struct airoha_pcs_priv *priv, int index);
+-	int (*rxlock_workaround)(struct airoha_pcs_priv *priv, int index);
++	int (*rxlock_workaround)(struct airoha_pcs_priv *priv, int index,
++				 bool link, bool an_complete);
+ };
+ 
+ #define to_airoha_pcs_port(n) container_of(n, struct airoha_pcs_port, pcs)
+@@ -1704,7 +1753,8 @@
+ 			   int index, phy_interface_t interface);
+ 
+ void an7581_pcs_phya_link_up(struct airoha_pcs_priv *priv, int index);
+-int an7581_pcs_rxlock_workaround(struct airoha_pcs_priv *priv, int index);
++int an7581_pcs_rxlock_workaround(struct airoha_pcs_priv *priv, int index,
++				 bool link, bool an_complete);
+ #else
+ static inline int an7581_pcs_alloc_regmap_fields(struct airoha_pcs_priv *priv)
+ {
+@@ -1734,7 +1784,8 @@
+ }
+ 
+ static inline int an7581_pcs_rxlock_workaround(struct airoha_pcs_priv *priv,
+-					       int index)
++					       int index, bool link,
++					       bool an_complete)
+ {
+ 	return 0;
+ }
+--- a/drivers/net/pcs/airoha/pcs-an7581.c
++++ b/drivers/net/pcs/airoha/pcs-an7581.c
+@@ -3,6 +3,7 @@
+  * Copyright (c) 2024 AIROHA Inc
+  * Author: Christian Marangi <ansuelsmth@gmail.com>
+  */
++#include <linux/jiffies.h>
+ #include <linux/phy/phy.h>
+ #include <linux/phylink.h>
+ #include <linux/property.h>
+@@ -11,6 +12,11 @@
+ #include "pcs-airoha.h"
+ 
+ #include <linux/of.h>
++
++#define AN7581_PCS_RXLOCK_MAX_ATTEMPTS	2
++#define AN7581_PCS_RXLOCK_RETRY_DELAY	HZ
++#define AN7581_PCS_RXLOCK_COOLDOWN	(30 * HZ)
++#define AN7581_PCS_RXLOCK_SIGNAL_LOSS	HZ
+ 
+ enum {
+ 	AN7581_PCS_CMN_EN,
+@@ -1977,20 +1983,24 @@
+ 	return __an7581_pcs_alloc_regmap_fields(priv, 1, an7581_pcs_pcie1_fields);
+ }
+ 
+-static bool an7581_pcs_have_rx_signal(struct airoha_pcs_priv *priv, int index)
++static int an7581_pcs_have_rx_signal(struct airoha_pcs_priv *priv, int index)
+ {
+ 	struct regmap *pcs_pma = priv->pcs_pma[index];
+ 	unsigned int count = 0;
+-	u32 val;
+-	int i;
+-
+-	regmap_write(pcs_pma, AIROHA_PCS_PMA_DIG_RESERVE_0,
+-		     AIROHA_PCS_TRIGGER_RX_SIDGET_SCAN);
++	u32 val = 0;
++	int i, ret;
++
++	ret = regmap_write(pcs_pma, AIROHA_PCS_PMA_DIG_RESERVE_0,
++			   AIROHA_PCS_TRIGGER_RX_SIDGET_SCAN);
++	if (ret)
++		return ret;
+ 
+ 	/* Scan 5 times for RX sigdet module to detect RX signal */
+ 	for (i = 0; i <= 5; i++) {
+-		regmap_read(pcs_pma, AIROHA_PCS_PMA_DIG_RO_RESERVE_2,
+-			    &val);
++		ret = regmap_read(pcs_pma, AIROHA_PCS_PMA_DIG_RO_RESERVE_2,
++				  &val);
++		if (ret)
++			return ret;
+ 		if (val & AIROHA_PCS_RX_SIGDET)
+ 			count++;
+ 	}
+@@ -1999,27 +2009,211 @@
+ 	return count >= 4;
+ }
+ 
+-int an7581_pcs_rxlock_workaround(struct airoha_pcs_priv *priv, int index)
++static void an7581_pcs_report_rxlock(struct airoha_pcs_priv *priv, int index,
++				     u32 pcs_status, bool signal, bool info,
++				     const char *action)
+ {
+ 	struct airoha_pcs_maps *maps = &priv->maps[index];
+-	u32 val;
+-
+-	/* Check if PCS is UP or Down */
+-	regmap_read(maps->usxgmii_pcs, AIROHA_PCS_USXGMII_PCS_STUS_1, &val);
+-	if (val & AIROHA_PCS_USXGMII_PCS_RX_LINK_STATUS_UP)
+-		return 0;
+-
+-	/* Validate if this is consistent with RX SigDet module */
+-	if (!an7581_pcs_have_rx_signal(priv, index))
+-		return 0;
+-
+-	/* If PCS is down but RX SigDet module detected signal,
+-	 * trigger CDR reset.
++	struct regmap *pcs_pma = priv->pcs_pma[index];
++	u32 base_r = 0, an_status = 0, an_done = 0;
++	u32 freqdet = 0, rst = 0;
++
++	regmap_read(maps->usxgmii_pcs,
++		    AIROHA_PCS_USXGMII_BASE_R_10GB_T_PCS_STUS_1, &base_r);
++	regmap_read(maps->usxgmii_pcs,
++		    AIROHA_PCS_USXGMII_PCS_AN_STATS_0, &an_status);
++	regmap_read(maps->usxgmii_pcs,
++		    AIROHA_PCS_USXGMII_PCS_AN_STATS_2, &an_done);
++	regmap_read(pcs_pma, AIROHA_PCS_PMA_RX_FREQDET, &freqdet);
++	regmap_read(pcs_pma, AIROHA_PCS_PMA_SW_RST_SET, &rst);
++
++	if (info)
++		dev_info_ratelimited(priv->dev,
++				     "port %d USXGMII RX: pcs=%#010x base-r=%#010x an=%#010x an-done=%#010x sigdet=%u freqdet=%#010x rst=%#010x action=%s resets=%u\n",
++				     index, pcs_status, base_r, an_status, an_done, signal,
++				     freqdet, rst, action, priv->rxlock_reset_count[index]);
++	else
++		dev_dbg_ratelimited(priv->dev,
++				    "port %d USXGMII RX: pcs=%#010x base-r=%#010x an=%#010x an-done=%#010x sigdet=%u freqdet=%#010x rst=%#010x action=%s resets=%u\n",
++				    index, pcs_status, base_r, an_status, an_done, signal,
++				    freqdet, rst, action, priv->rxlock_reset_count[index]);
++}
++
++int an7581_pcs_rxlock_workaround(struct airoha_pcs_priv *priv, int index,
++				 bool link, bool an_complete)
++{
++	struct airoha_pcs_rxlock_recovery *recovery =
++		&priv->ports[index].rxlock;
++	struct airoha_pcs_maps *maps = &priv->maps[index];
++	struct regmap *pcs_pma = priv->pcs_pma[index];
++	const char *action = NULL;
++	u32 base_r = 0, freqdet = 0, val = 0;
++	bool receiver_ready;
++	int ret, signal;
++
++	lockdep_assert_held(&recovery->lock);
++	if (recovery->state == AIROHA_PCS_RXLOCK_RECONFIGURING)
++		return -EAGAIN;
++	if (recovery->state == AIROHA_PCS_RXLOCK_CONFIG_FAILED)
++		return -EIO;
++
++	/* The in-band link bit describes the link reported by the partner. It
++	 * must not bypass the local receiver checks: the last AN word can remain
++	 * visible while the local CDR or Base-R block lock is lost.
+ 	 */
++	ret = regmap_read(maps->usxgmii_pcs,
++			  AIROHA_PCS_USXGMII_PCS_STUS_1, &val);
++	if (ret)
++		goto out;
++
++	receiver_ready = val & AIROHA_PCS_USXGMII_PCS_RX_LINK_STATUS_UP;
++	if (receiver_ready)
++		goto receiver_ready;
++
++	signal = an7581_pcs_have_rx_signal(priv, index);
++	if (signal < 0) {
++		ret = signal;
++		goto out;
++	}
++	if (!signal) {
++		if (recovery->signal_lost) {
++			action = "no-signal";
++		} else if (!recovery->signal_loss_pending) {
++			recovery->signal_loss_pending = true;
++			recovery->signal_loss_deadline =
++				jiffies + AN7581_PCS_RXLOCK_SIGNAL_LOSS;
++			action = "no-signal-observe";
++		} else if (time_before(jiffies,
++				       recovery->signal_loss_deadline)) {
++			action = "no-signal-observe";
++		} else {
++			airoha_pcs_rxlock_rearm(recovery);
++			recovery->signal_lost = true;
++			action = "no-signal-rearm";
++		}
++
++		an7581_pcs_report_rxlock(priv, index, val, false, false, action);
++		ret = -ENOLINK;
++		goto out;
++	}
++
++	/* A single no-signal sample does not end the current signal epoch. */
++	recovery->signal_loss_pending = false;
++	recovery->signal_loss_deadline = 0;
++	recovery->signal_lost = false;
++
++	ret = regmap_read(maps->usxgmii_pcs,
++			  AIROHA_PCS_USXGMII_BASE_R_10GB_T_PCS_STUS_1,
++			  &base_r);
++	if (ret)
++		goto out;
++
++	ret = regmap_read(pcs_pma, AIROHA_PCS_PMA_RX_FREQDET, &freqdet);
++	if (ret)
++		goto out;
++
++	receiver_ready = (freqdet & AIROHA_PCS_PMA_FBCK_LOCK) &&
++			 (base_r & AIROHA_PCS_USXGMII_PCS_BLK_LK);
++
++receiver_ready:
++	if (receiver_ready) {
++		recovery->signal_loss_pending = false;
++		recovery->signal_loss_deadline = 0;
++		recovery->signal_lost = false;
++		if (link) {
++			airoha_pcs_rxlock_rearm(recovery);
++			ret = 0;
++			goto out;
++		} else if (recovery->state != AIROHA_PCS_RXLOCK_EXHAUSTED) {
++			recovery->state = AIROHA_PCS_RXLOCK_AN_WAIT;
++			recovery->deadline = 0;
++		}
++
++		ret = 0;
++		goto out;
++	}
++
++	switch (recovery->state) {
++	case AIROHA_PCS_RXLOCK_IDLE:
++	case AIROHA_PCS_RXLOCK_AN_WAIT:
++		recovery->state = AIROHA_PCS_RXLOCK_OBSERVE;
++		recovery->deadline = jiffies + AN7581_PCS_RXLOCK_RETRY_DELAY;
++		action = an_complete ? "observe-an-complete" : "observe";
++		ret = -EAGAIN;
++		break;
++	case AIROHA_PCS_RXLOCK_OBSERVE:
++	case AIROHA_PCS_RXLOCK_SETTLING:
++		if (time_before(jiffies, recovery->deadline)) {
++			action = recovery->state == AIROHA_PCS_RXLOCK_OBSERVE ?
++				 "observe" : "settling";
++			ret = -EAGAIN;
++			break;
++		}
++
++		if (recovery->attempts >= AN7581_PCS_RXLOCK_MAX_ATTEMPTS) {
++			recovery->state = AIROHA_PCS_RXLOCK_EXHAUSTED;
++			recovery->deadline =
++				jiffies + AN7581_PCS_RXLOCK_COOLDOWN;
++			action = "cooldown";
++			ret = -ETIMEDOUT;
++			break;
++		}
++		goto reset;
++	case AIROHA_PCS_RXLOCK_RECONFIGURING:
++		action = "reconfiguring";
++		ret = -EAGAIN;
++		break;
++	case AIROHA_PCS_RXLOCK_CONFIG_FAILED:
++		action = "config-failed";
++		ret = -EIO;
++		break;
++	case AIROHA_PCS_RXLOCK_RESETTING:
++		action = "resetting";
++		ret = -EAGAIN;
++		break;
++	case AIROHA_PCS_RXLOCK_EXHAUSTED:
++		if (time_before(jiffies, recovery->deadline)) {
++			action = "cooldown";
++			ret = -ETIMEDOUT;
++			break;
++		}
++
++		recovery->attempts = 0;
++		recovery->state = AIROHA_PCS_RXLOCK_OBSERVE;
++		recovery->deadline =
++			jiffies + AN7581_PCS_RXLOCK_RETRY_DELAY;
++		action = "reobserve";
++		ret = -EAGAIN;
++		break;
++	default:
++		recovery->state = AIROHA_PCS_RXLOCK_EXHAUSTED;
++		recovery->attempts = AN7581_PCS_RXLOCK_MAX_ATTEMPTS;
++		recovery->deadline = jiffies + AN7581_PCS_RXLOCK_COOLDOWN;
++		action = "invalid-state";
++		ret = -EIO;
++		break;
++	}
++	goto report;
++
++reset:
++	recovery->state = AIROHA_PCS_RXLOCK_RESETTING;
++	recovery->attempts++;
++	priv->rxlock_reset_count[index]++;
++	an7581_pcs_report_rxlock(priv, index, val, true, true, "cdr-reset");
+ 	an7581_pcs_cdr_reset(priv, index, PHY_INTERFACE_MODE_NA, false);
+-
+-	/* Report there is an error with Link Detection and we
+-	 * should test again later.
+-	 */
+-	return -EINVAL;
++	if (recovery->attempts >= AN7581_PCS_RXLOCK_MAX_ATTEMPTS) {
++		recovery->state = AIROHA_PCS_RXLOCK_EXHAUSTED;
++		recovery->deadline = jiffies + AN7581_PCS_RXLOCK_COOLDOWN;
++	} else {
++		recovery->state = AIROHA_PCS_RXLOCK_SETTLING;
++		recovery->deadline = jiffies + AN7581_PCS_RXLOCK_RETRY_DELAY;
++	}
++	ret = -EAGAIN;
++	goto out;
++
++report:
++	an7581_pcs_report_rxlock(priv, index, val, true, false, action);
++
++out:
++	return ret;
+ }

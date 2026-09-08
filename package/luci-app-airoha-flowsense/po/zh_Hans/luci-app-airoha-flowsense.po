@@ -211,10 +211,6 @@ msgstr "检测到 NPU 绕过"
 msgid "HW offload is enabled but ISP latency is high. Latency management may be skipped by hardware acceleration."
 msgstr "硬件加速已启用，但 ISP 延迟较高。延迟管理可能被硬件加速跳过。"
 
-# Band health
-msgid "No clients"
-msgstr "无客户端"
-
 msgid "Drop:"
 msgstr "丢包："
 
@@ -273,3 +269,126 @@ msgstr "错误"
 
 msgid "ERRORS"
 msgstr "错误"
+
+msgid "AP mode"
+msgstr "AP 模式"
+
+msgid "BND flows"
+msgstr "已绑定流"
+
+msgid "Buffer drops detected"
+msgstr "检测到缓冲区丢包"
+
+msgid "CPU load"
+msgstr "CPU 负载"
+
+msgid "CPU path"
+msgstr "CPU 路径"
+
+msgid "Clients"
+msgstr "客户端"
+
+msgid "Current transmit throughput"
+msgstr "当前发送吞吐量"
+
+msgid "Detecting"
+msgstr "检测中"
+
+msgid "Edit target"
+msgstr "编辑目标"
+
+msgid "Ethernet ports"
+msgstr "以太网端口"
+
+msgid "Flows"
+msgstr "流"
+
+msgid "Frequency unavailable"
+msgstr "频率不可用"
+
+msgid "Hardware accelerated"
+msgstr "硬件加速"
+
+msgid "Mbps effective capacity"
+msgstr "Mbps 有效容量"
+
+msgid "NPU idle"
+msgstr "NPU 空闲"
+
+msgid "NPU path"
+msgstr "NPU 路径"
+
+msgid "No active drops"
+msgstr "未检测到丢包"
+
+msgid "No link"
+msgstr "未连接"
+
+msgid "No samples"
+msgstr "暂无样本"
+
+msgid "PPE flows"
+msgstr "PPE 流"
+
+msgid "Ping target IP or hostname:"
+msgstr "Ping 目标 IP 地址或主机名："
+
+msgid "Retry"
+msgstr "重试"
+
+msgid "Router mode"
+msgstr "路由模式"
+
+msgid "Signal"
+msgstr "信号"
+
+msgid "Unable to refresh FlowSense. Retrying automatically."
+msgstr "无法刷新 FlowSense，正在自动重试。"
+
+msgid "WAN TX"
+msgstr "WAN 发送"
+
+msgid "Wi-Fi radios"
+msgstr "Wi-Fi 无线电"
+
+msgid "connected clients"
+msgstr "个已连接客户端"
+
+msgid "jitter"
+msgstr "抖动"
+
+msgid "link errors"
+msgstr "链路错误"
+
+msgid "links up"
+msgstr "条链路已连接"
+
+msgid "offloaded"
+msgstr "已卸载"
+
+msgid "unknown"
+msgstr "未知"
+
+msgid "Active WAN detected"
+msgstr "检测到活动 WAN"
+
+msgid "No active WAN"
+msgstr "没有活动 WAN"
+
+msgid "WAN flow attribution unavailable"
+msgstr "无法确定 WAN 流归属"
+
+msgid "Click to change ping target"
+msgstr "点击更改 Ping 目标"
+
+msgid "DETECTING"
+msgstr "检测中"
+
+msgid "Failed to set ping target"
+msgstr "无法设置 Ping 目标"
+
+msgid "Ping target IP:"
+msgstr "Ping 目标 IP 地址："
+
+msgid "Ping target changed to: "
+msgstr "Ping 目标已更改为："

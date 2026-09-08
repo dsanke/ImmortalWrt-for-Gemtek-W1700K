@@ -1,0 +1,26 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] clk: en7523: initialize the reset update value
+
+The reset update value is a local variable. Combining a reset bit with
+its uninitialized contents is undefined behavior and can leave the bit
+set when deasserting a normal reset or asserting an inverted PCIe reset.
+Assign the complete masked value for each bank polarity before the
+regmap update so reset consumers get the requested level.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+
+--- a/drivers/clk/clk-en7523.c
++++ b/drivers/clk/clk-en7523.c
+@@ -1034,9 +1034,9 @@
+ 
+ 	/* For PCIC reset logic is inverted, 0:assert 1:deassert*/
+ 	if (addr == REG_NP_SCU_PCIC)
+-		val |= assert ? 0 : BIT(id % RST_NR_PER_BANK);
++		val = assert ? 0 : BIT(id % RST_NR_PER_BANK);
+ 	else
+-		val |= assert ? BIT(id % RST_NR_PER_BANK) : 0;
++		val = assert ? BIT(id % RST_NR_PER_BANK) : 0;
+ 
+ 	return regmap_update_bits(rst_data->map, addr,
+ 				  BIT(id % RST_NR_PER_BANK), val);

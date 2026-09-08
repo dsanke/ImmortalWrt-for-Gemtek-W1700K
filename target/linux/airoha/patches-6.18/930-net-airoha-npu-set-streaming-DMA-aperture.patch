@@ -1,0 +1,30 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] net: airoha: constrain streaming and coherent NPU DMA
+
+Port the PR DMA aperture fix onto the retained upstream coherent mailbox
+implementation. Set both masks and constrain allocations to the NPU bus
+aperture; the following mailbox patch also verifies each allocated range.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+
+--- a/drivers/net/ethernet/airoha/airoha_npu.c
++++ b/drivers/net/ethernet/airoha/airoha_npu.c
+@@ -29,6 +29,7 @@
+  * is 16 bytes (INODE_TXRX_REG_ADDR). Keep headroom for future commands.
+  */
+ #define AIROHA_NPU_MBOX_SIZE			256
++#define NPU_DMA_ADDR_MAX			0xbfffffffULL
+ 
+ #define REG_NPU_LOCAL_SRAM		0x0
+ 
+@@ -792,7 +793,8 @@
+ 		npu->irqs[i] = irq;
+ 	}
+ 
+-	err = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
++	dev->bus_dma_limit = NPU_DMA_ADDR_MAX;
++	err = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
+ 	if (err)
+ 		return err;
+ 

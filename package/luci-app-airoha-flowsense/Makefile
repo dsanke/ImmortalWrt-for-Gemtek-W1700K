@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 LUCI_NAME:=luci-app-airoha-flowsense
 PKG_VERSION:=1.1.3
-PKG_RELEASE:=5
+PKG_RELEASE:=8
 PKG_LICENSE:=Apache-2.0
 PKG_MAINTAINER:=XR1710G Maintainer
 TITLE:=LuCI Airoha XR1710G FlowSense

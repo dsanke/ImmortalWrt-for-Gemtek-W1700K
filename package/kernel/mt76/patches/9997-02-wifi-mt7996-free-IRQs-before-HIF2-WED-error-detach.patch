@@ -1,0 +1,24 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] wifi: mt7996: free IRQs before HIF2 WED error detach
+
+The primary shared IRQ is already registered when HIF2 IRQ setup fails.
+Its handler accesses both WED instances before checking whether device
+initialization finished. HIF2 WED detach clears its ops and hardware
+pointers, so detach must not race that still-registered primary handler.
+
+Release registered IRQs first. The later common cleanup call is safe:
+mt7996_free_irqs() tracks and clears each registration separately.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+diff --git a/mt7996/pci.c b/mt7996/pci.c
+--- a/mt7996/pci.c
++++ b/mt7996/pci.c
+@@ -282,6 +282,7 @@
+ 		return ret;
+ 	}
+ free_hif2_wed_irq_vector:
++	mt7996_free_irqs(dev);
+ 	if (dev->hif2) {
+ 		if (mtk_wed_device_active(&dev->mt76.mmio.wed_hif2))
+ 			mtk_wed_device_detach(&dev->mt76.mmio.wed_hif2);

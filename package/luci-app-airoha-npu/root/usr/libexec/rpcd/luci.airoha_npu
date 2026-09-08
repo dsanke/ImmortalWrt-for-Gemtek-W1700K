@@ -75,19 +75,25 @@ _devmem_read() {
 }
 
 _has_active_wan() {
-	local wan_status up l3_device ipv4 ipv6
+	local interface wan_status up l3_device ipv4 ipv6
 
-	wan_status=$(ubus call network.interface.wan status 2>/dev/null)
-	[ -n "$wan_status" ] || return 1
+	# DHCP and DHCPv6 use independent logical interfaces by default.
+	# Either can remain routed while the other has no active lease.
+	for interface in wan wan6; do
+		wan_status=$(ubus call "network.interface.$interface" status 2>/dev/null)
+		[ -n "$wan_status" ] || continue
 
-	up=$(printf '%s' "$wan_status" | jsonfilter -e "@.up" 2>/dev/null)
-	[ "$up" = "true" ] || return 1
+		up=$(printf '%s' "$wan_status" | jsonfilter -e "@.up" 2>/dev/null)
+		[ "$up" = "true" ] || continue
 
-	l3_device=$(printf '%s' "$wan_status" | jsonfilter -e "@.l3_device" 2>/dev/null)
-	ipv4=$(printf '%s' "$wan_status" | jsonfilter -e "@['ipv4-address'][0].address" 2>/dev/null)
-	ipv6=$(printf '%s' "$wan_status" | jsonfilter -e "@['ipv6-address'][0].address" 2>/dev/null)
+		l3_device=$(printf '%s' "$wan_status" | jsonfilter -e "@.l3_device" 2>/dev/null)
+		ipv4=$(printf '%s' "$wan_status" | jsonfilter -e "@['ipv4-address'][0].address" 2>/dev/null)
+		ipv6=$(printf '%s' "$wan_status" | jsonfilter -e "@['ipv6-address'][0].address" 2>/dev/null)
 
-	[ -n "$l3_device$ipv4$ipv6" ]
+		[ -n "$l3_device$ipv4$ipv6" ] && return 0
+	done
+
+	return 1
 }
 
 _bridge_offload_blocked() {

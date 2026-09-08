@@ -1,0 +1,43 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] clk: en7523: propagate reset regmap errors
+
+Do not report a successful DMA reset fence after a failed register write
+or consume an uninitialized reset status after a failed read.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+
+--- a/drivers/clk/clk-en7523.c
++++ b/drivers/clk/clk-en7523.c
+@@ -1038,10 +1038,8 @@
+ 	else
+ 		val |= assert ? BIT(id % RST_NR_PER_BANK) : 0;
+ 
+-	regmap_update_bits(rst_data->map, addr, BIT(id % RST_NR_PER_BANK),
+-			   val);
+-
+-	return 0;
++	return regmap_update_bits(rst_data->map, addr,
++				  BIT(id % RST_NR_PER_BANK), val);
+ }
+ 
+ static int en7523_reset_assert(struct reset_controller_dev *rcdev,
+@@ -1062,13 +1060,17 @@
+ 	struct en_rst_data *rst_data = container_of(rcdev, struct en_rst_data, rcdev);
+ 	u32 addr = rst_data->bank_ofs[id / RST_NR_PER_BANK];
+ 	bool inverted = false;
++	int err;
+ 	u32 val;
+ 
+ 	/* For PCIC reset logic is inverted, 0:assert 1:deassert*/
+ 	if (addr == REG_NP_SCU_PCIC)
+ 		inverted = true;
+ 
+-	regmap_read(rst_data->map, addr, &val);
++	err = regmap_read(rst_data->map, addr, &val);
++	if (err)
++		return err;
++
+ 	val &= BIT(id % RST_NR_PER_BANK);
+ 	return inverted ? !val : !!val;
+ }

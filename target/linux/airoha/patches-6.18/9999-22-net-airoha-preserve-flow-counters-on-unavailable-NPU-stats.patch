@@ -1,0 +1,81 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] net: airoha: preserve flow counters on unavailable NPU stats
+
+Report whether a hardware statistics sample is available. A stopped NPU
+must not turn a previously nonzero sample into zero and wrap the unsigned
+flow counters. Preserve the previous sample until a valid read succeeds.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+
+--- a/drivers/net/ethernet/airoha/airoha_ppe.c
++++ b/drivers/net/ethernet/airoha/airoha_ppe.c
+@@ -1529,23 +1529,24 @@
+ 	return 0;
+ }
+ 
+-void airoha_ppe_foe_entry_get_stats(struct airoha_ppe *ppe, u32 hash,
++bool airoha_ppe_foe_entry_get_stats(struct airoha_ppe *ppe, u32 hash,
+ 				    struct airoha_foe_stats64 *stats)
+ {
+ 	struct airoha_eth *eth = ppe->eth;
+ 	int ppe_num_stats_entries;
+ 	struct airoha_npu *npu;
+ 	u32 index;
++	bool valid = false;
+ 
+ 	ppe_num_stats_entries = airoha_ppe_get_total_num_stats_entries(ppe);
+ 	if (ppe_num_stats_entries < 0)
+-		return;
++		return false;
+ 
+ 	if (airoha_ppe_foe_get_flow_stats_index(ppe, hash, &index))
+-		return;
++		return false;
+ 
+ 	if (index >= ppe_num_stats_entries)
+-		return;
++		return false;
+ 
+ 	rcu_read_lock();
+ 
+@@ -1559,9 +1560,12 @@
+ 			      sizeof(*npu->stats));
+ 		stats->packets = packets << 32 | npu_stats.packets;
+ 		stats->bytes = bytes << 32 | npu_stats.bytes;
++		valid = true;
+ 	}
+ 
+ 	rcu_read_unlock();
++
++	return valid;
+ }
+ 
+ static int airoha_ppe_flow_offload_stats(struct airoha_eth *eth,
+@@ -1581,10 +1585,11 @@
+ 	if (e->hash != 0xffff) {
+ 		struct airoha_foe_stats64 stats = {};
+ 
+-		airoha_ppe_foe_entry_get_stats(eth->ppe, e->hash, &stats);
+-		f->stats.pkts += (stats.packets - e->stats.packets);
+-		f->stats.bytes += (stats.bytes - e->stats.bytes);
+-		e->stats = stats;
++		if (airoha_ppe_foe_entry_get_stats(eth->ppe, e->hash, &stats)) {
++			f->stats.pkts += stats.packets - e->stats.packets;
++			f->stats.bytes += stats.bytes - e->stats.bytes;
++			e->stats = stats;
++		}
+ 	}
+ 
+ 	return 0;
+--- a/drivers/net/ethernet/airoha/airoha_eth.h
++++ b/drivers/net/ethernet/airoha/airoha_eth.h
+@@ -780,7 +780,7 @@
+ u32 airoha_ppe_get_total_num_entries(struct airoha_ppe *ppe);
+ struct airoha_foe_entry *airoha_ppe_foe_get_entry(struct airoha_ppe *ppe,
+ 						  u32 hash);
+-void airoha_ppe_foe_entry_get_stats(struct airoha_ppe *ppe, u32 hash,
++bool airoha_ppe_foe_entry_get_stats(struct airoha_ppe *ppe, u32 hash,
+ 				    struct airoha_foe_stats64 *stats);
+ 
+ #ifdef CONFIG_DEBUG_FS

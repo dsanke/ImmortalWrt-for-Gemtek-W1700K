@@ -1,13 +1,70 @@
 msgid ""
 msgstr "Content-Type: text/plain; charset=UTF-8\n"
 
+msgid "ACTIVE"
+msgstr ""
+
+msgid "AP MODE"
+msgstr ""
+
+msgid "AP mode"
+msgstr ""
+
+msgid "Active WAN detected"
+msgstr ""
+
 msgid "Airoha FlowSense"
 msgstr ""
 
-msgid "AP Mode Acceleration"
+msgid "Auto-detected"
+msgstr ""
+
+msgid "BND flows"
+msgstr ""
+
+msgid "Buffer drops detected"
+msgstr ""
+
+msgid "CLEAN"
+msgstr ""
+
+msgid "CPU PATH"
+msgstr ""
+
+msgid "CPU load"
+msgstr ""
+
+msgid "CPU path"
+msgstr ""
+
+msgid "Click to change ping target"
+msgstr ""
+
+msgid "Clients"
+msgstr ""
+
+msgid "Current transmit throughput"
+msgstr ""
+
+msgid "DETECTING"
+msgstr ""
+
+msgid "DHCP disabled in UCI"
+msgstr ""
+
+msgid "DROPPING"
+msgstr ""
+
+msgid "Detecting"
 msgstr ""
 
 msgid "Disabled"
+msgstr ""
+
+msgid "ERROR"
+msgstr ""
+
+msgid "Edit target"
 msgstr ""
 
 msgid "Enabled"
@@ -16,28 +73,127 @@ msgstr ""
 msgid "Error: "
 msgstr ""
 
-msgid "HW Flow Offload"
+msgid "Ethernet ports"
+msgstr ""
+
+msgid "Failed to set ping target"
+msgstr ""
+
+msgid "Flows"
+msgstr ""
+
+msgid "Frequency unavailable"
+msgstr ""
+
+msgid "HEALTHY"
+msgstr ""
+
+msgid "HW Buffer"
+msgstr ""
+
+msgid "Hardware accelerated"
+msgstr ""
+
+msgid "IDLE"
+msgstr ""
+
+msgid "Idle"
 msgstr ""
 
 msgid "Index"
 msgstr ""
 
+msgid "Integrity"
+msgstr ""
+
+msgid "Latency"
+msgstr ""
+
+msgid "Local gateway detected"
+msgstr ""
+
+msgid "MODE detecting..."
+msgstr ""
+
+msgid "Mbps effective capacity"
+msgstr ""
+
+msgid "NO CLIENTS"
+msgstr ""
+
+msgid "NO DATA"
+msgstr ""
+
+msgid "NPU Path"
+msgstr ""
+
+msgid "NPU idle"
+msgstr ""
+
+msgid "NPU path"
+msgstr ""
+
+msgid "No WAN IP detected"
+msgstr ""
+
+msgid "No active WAN"
+msgstr ""
+
+msgid "No active drops"
+msgstr ""
+
 msgid "No entries"
+msgstr ""
+
+msgid "No link"
+msgstr ""
+
+msgid "No samples"
 msgstr ""
 
 msgid "Original"
 msgstr ""
 
+msgid "POOR"
+msgstr ""
+
+msgid "PPE flows"
+msgstr ""
+
 msgid "Pause"
 msgstr ""
 
-msgid "PPPoE Offload"
+msgid "Ping target IP or hostname:"
+msgstr ""
+
+msgid "Ping target IP:"
+msgstr ""
+
+msgid "Ping target changed to: "
+msgstr ""
+
+msgid "ROUTER MODE"
+msgstr ""
+
+msgid "RX"
 msgstr ""
 
 msgid "Resume"
 msgstr ""
 
+msgid "Retry"
+msgstr ""
+
+msgid "Router mode"
+msgstr ""
+
+msgid "Signal"
+msgstr ""
+
 msgid "State"
+msgstr ""
+
+msgid "TX"
 msgstr ""
 
 msgid "Translated"
@@ -46,5 +202,35 @@ msgstr ""
 msgid "Type"
 msgstr ""
 
-msgid "VLAN Offload"
+msgid "Unable to refresh FlowSense. Retrying automatically."
+msgstr ""
+
+msgid "WAN TX"
+msgstr ""
+
+msgid "WAN flow attribution unavailable"
+msgstr ""
+
+msgid "WEAK"
+msgstr ""
+
+msgid "Wi-Fi radios"
+msgstr ""
+
+msgid "connected clients"
+msgstr ""
+
+msgid "jitter"
+msgstr ""
+
+msgid "link errors"
+msgstr ""
+
+msgid "links up"
+msgstr ""
+
+msgid "offloaded"
+msgstr ""
+
+msgid "unknown"
 msgstr ""

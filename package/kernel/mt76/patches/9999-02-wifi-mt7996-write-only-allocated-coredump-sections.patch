@@ -1,0 +1,33 @@
+From: OpenAI Codex <noreply@openai.com>
+Subject: [PATCH] wifi: mt7996: write only allocated coredump sections
+
+When memory dumping is disabled, or the chip has no memory layout, the
+buffer contains only the fixed coredump header. Writing the memory section
+length unconditionally writes four bytes beyond the requested allocation.
+
+Use the same condition for constructing and allocating the memory section.
+
+Signed-off-by: OpenAI Codex <noreply@openai.com>
+---
+ mt7996/coredump.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/mt7996/coredump.c b/mt7996/coredump.c
+--- a/mt7996/coredump.c
++++ b/mt7996/coredump.c
+@@ -202,11 +202,12 @@ static struct mt7996_coredump *mt7996_coredump_build(struct mt7996_dev *dev)
+ 	mt7996_coredump_fw_stack(dev, dump, exception);
+ 
+ 	/* gather memory content */
+-	dump_mem = (struct mt7996_coredump_mem *)(buf + sofar);
+-	dump_mem->len = crash_data->memdump_buf_len;
+-	if (coredump_memdump && crash_data->memdump_buf_len)
++	if (coredump_memdump && crash_data->memdump_buf_len) {
++		dump_mem = (struct mt7996_coredump_mem *)(buf + sofar);
++		dump_mem->len = crash_data->memdump_buf_len;
+ 		memcpy(dump_mem->data, crash_data->memdump_buf,
+ 		       crash_data->memdump_buf_len);
++	}
+ 
+ 	mutex_unlock(&dev->dump_mutex);
+ 

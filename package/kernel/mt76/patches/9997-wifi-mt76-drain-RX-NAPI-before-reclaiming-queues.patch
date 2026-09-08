@@ -1,0 +1,45 @@
+From: OpenAI Codex <codex@openai.com>
+Subject: [PATCH] wifi: mt76: drain RX NAPI before reclaiming queue buffers
+
+Keep the upstream order between netif_napi_del() and RX queue cleanup.
+The shared RX queue initializer enables threaded NAPI, while older drivers
+such as mt7603 and mt7615 do not disable their RX NAPI in removal. Deleting
+NAPI stops that thread and waits for a network grace period; reclaiming
+buffers and destroying the page pool first lets a running poll race them.
+
+Retain MT7996's tracked disable and the other drivers' existing ownership
+of napi_disable(), so already-disabled instances are not disabled twice.
+
+Signed-off-by: OpenAI Codex <codex@openai.com>
+---
+diff --git a/dma.c b/dma.c
+--- a/dma.c
++++ b/dma.c
+@@ -1306,20 +1306,21 @@
+ 		struct mt76_queue *q = &dev->q_rx[i];
+ 		bool napi_registered = test_bit(i, &dev->napi_registered);
+ 
+-		/* Untracked drivers disable RX NAPI in their own remove path. */
++		/* Keep each driver's existing RX-disable ownership. Deleting
++		 * NAPI must still drain its thread and poll tails before buffers.
++		 */
+ 		if (napi_registered && dev->napi_state_tracked)
+ 			mt76_napi_disable(dev, i, &dev->napi[i]);
++		if (napi_registered) {
++			netif_napi_del(&dev->napi[i]);
++			clear_bit(i, &dev->napi_registered);
++		}
+ 		if (q->ndesc)
+ 			mt76_dma_rx_cleanup(dev, q);
+ 
+ 		if (q->page_pool) {
+ 			page_pool_destroy(q->page_pool);
+ 			q->page_pool = NULL;
+-		}
+-
+-		if (napi_registered) {
+-			netif_napi_del(&dev->napi[i]);
+-			clear_bit(i, &dev->napi_registered);
+ 		}
+ 	}
+ 

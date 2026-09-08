@@ -281,6 +281,15 @@ get_status() {
 		"${cpu_cur_freq:-0}" "${cpu_hw_freq:-0}" "${cpu_governor:-unknown}" "${cpu_avail_governors:-}" "${cpu_min_freq:-0}" "${cpu_max_freq:-0}" "${cpu_avail_freqs:-}" "${cpu_count:-0}" "${pll_freq:-0}"
 }
 
+get_port_fdb_macs() {
+	local device="$1"
+
+	[ -n "$device" ] || return
+	bridge fdb show dev "$device" 2>/dev/null |
+		grep -v " self\| permanent" | awk '{print $1}' |
+		tr '\n' '|' | sed 's/|$//'
+}
+
 get_ppe_entries() {
 	local bind_file="/tmp/luci-airoha-flowsense.ppe-bind.$$"
 	local entries_file="/tmp/luci-airoha-flowsense.ppe-entries.$$"
@@ -399,36 +408,69 @@ get_ppe_entries() {
 	local band_unb="[0,0,0]"
 	if [ -f "$entries_file" ]; then
 		band_unb=$(awk -v i0="$ips0" -v i1="$ips1" -v i2="$ips2" '
-		function has(ips, ip,    n,arr,i) {
-			if (ips == "") return 0
-			n = split(ips, arr, "|")
-			for (i=1; i<=n; i++) if (arr[i] == ip) return 1
-			return 0
+		# The PPE prints expanded IPv6 addresses, while ip neigh compresses
+		# them. Compare canonical hextets; 5T and DS-LITE append ports.
+		function normalize(ip,    parts,left,right,nl,nr,i,out,part,dotted,octets,n) {
+			ip=tolower(ip)
+			if (index(ip, ":") == 0) return ip
+			if (index(ip, ".")) {
+				n=split(ip,parts,":"); dotted=parts[n]
+				if (split(dotted,octets,".") != 4) return ""
+				ip=substr(ip,1,length(ip)-length(dotted)) sprintf("%x:%x",octets[1]*256+octets[2],octets[3]*256+octets[4])
+			}
+			n=split(ip,parts,"::")
+			nl=parts[1] == "" ? 0 : split(parts[1],left,":")
+			nr=n == 2 && parts[2] != "" ? split(parts[2],right,":") : 0
+			out=""
+			for (i=1; i<=8; i++) {
+				part=i<=nl ? left[i] : (i>8-nr ? right[i-(8-nr)] : "0")
+				sub(/^0+/,"",part); if (part == "") part="0"
+				out=out (i>1 ? ":" : "") part
+			}
+			return out
 		}
+		function remember(ips, band,    n,arr,i,key) {
+			n=split(ips,arr,"|")
+			for (i=1; i<=n; i++) {
+				key=normalize(arr[i])
+				if (key != "" && !(key in bands)) bands[key]=band
+			}
+		}
+		BEGIN { remember(i0,1); remember(i1,2); remember(i2,3) }
 		/^[0-9a-fA-F]+ UNB / {
 			src=""
 			match($0,/orig=[^ \t]+/)
 			if (RSTART>0) {
 				orig=substr($0,RSTART+5,RLENGTH-5)
-				if (substr(orig,1,1) != "[") { n=split(orig,p,":"); src=p[1] }
+				split(orig,endpoints,"->"); src=endpoints[1]
+				if ($4 == "5T" || $3 == "DS-LITE") sub(/:[^:]*$/,"",src)
+				src=normalize(src)
 			}
-			if (src != "") {
-				if      (has(i0,src)) c0++
-				else if (has(i1,src)) c1++
-				else if (has(i2,src)) c2++
-			}
+			if      (bands[src] == 1) c0++
+			else if (bands[src] == 2) c1++
+			else if (bands[src] == 3) c2++
 		}
 		END { printf "[%d,%d,%d]", c0+0, c1+0, c2+0 }
 		' "$entries_file" 2>/dev/null || printf "[0,0,0]")
 	fi
 	unb_json=$(printf '%s' "$unb_json" | sed 's/}$/,"band_unb":'"$band_unb"'}/')
 
-	# Per-port BND counts for LAN ports using bridge FDB learned MACs
+	# Keep PPE slots logical even where direct MAC ports retain ethX names.
+	local port1_dev=lan1 port2_dev=lan2 port3_dev=lan3 port4_dev=lan4
+	case "$(board_name 2>/dev/null)" in
+	gemtek,w1700k-ubi)
+		port1_dev=""; port2_dev=eth2; port3_dev=lan3; port4_dev=lan4
+		;;
+	gemtek,xr1710g-ubi)
+		port1_dev=eth2; port2_dev=lan2; port3_dev=lan3; port4_dev=""
+		;;
+	esac
+
 	local macs_p1 macs_p2 macs_p3 macs_p4
-	macs_p1=$(bridge fdb show dev lan1 2>/dev/null | grep -v " self\| permanent" | awk '{print $1}' | tr '\n' '|' | sed 's/|$//')
-	macs_p2=$(bridge fdb show dev lan2 2>/dev/null | grep -v " self\| permanent" | awk '{print $1}' | tr '\n' '|' | sed 's/|$//')
-	macs_p3=$(bridge fdb show dev lan3 2>/dev/null | grep -v " self\| permanent" | awk '{print $1}' | tr '\n' '|' | sed 's/|$//')
-	macs_p4=$(bridge fdb show dev lan4 2>/dev/null | grep -v " self\| permanent" | awk '{print $1}' | tr '\n' '|' | sed 's/|$//')
+	macs_p1=$(get_port_fdb_macs "$port1_dev")
+	macs_p2=$(get_port_fdb_macs "$port2_dev")
+	macs_p3=$(get_port_fdb_macs "$port3_dev")
+	macs_p4=$(get_port_fdb_macs "$port4_dev")
 
 	local port_bnd="[0,0,0,0]"
 	if [ -f "$bind_file" ]; then
@@ -478,19 +520,19 @@ get_token_info() {
 		sta_json="${sta_json}{\"band\":${band},\"count\":${1:-0},\"tx_packets\":${2:-0},\"tx_retries\":${3:-0}}"
 	done
 
-	if [ ! -f "$token_file" ]; then
-		printf '{"token_count":0,"token_size":0,"npu_active":false,"tx_queues":[],"station_counts":[%s]}' "$sta_json"
+	if [ ! -s "$token_file" ]; then
+		printf '{"available":false,"token_count":null,"token_size":null,"npu_active":null,"tx_queues":[],"station_counts":[%s]}' "$sta_json"
 		rm -f "$token_file"
 		return
 	fi
 
 	awk -v stations="$sta_json" '
 	BEGIN {
-		tc=0; ts=0; npu=0
+		tc=0; ts=0; npu=0; available=0
 		tq_n=0
 	}
-	/^  token_count:/ { tc=$2+0; ts=$4+0 }
-	/status:.*active/ { npu=1 }
+	/^  token_count:/ { tc=$2+0; ts=$4+0; available=1 }
+	/status:[[:space:]]*active([[:space:]]|$)/ { npu=1 }
 	/band [0-9]/ {
 		gsub(/\|/, " ")
 		for(i=1;i<=NF;i++) {
@@ -506,8 +548,8 @@ get_token_info() {
 		tq_n++
 	}
 	END {
-		printf "{\"token_count\":%d,\"token_size\":%d,\"npu_active\":%s,\"tx_queues\":[", \
-			tc, ts, (npu?"true":"false")
+		printf "{\"available\":%s,\"token_count\":%d,\"token_size\":%d,\"npu_active\":%s,\"tx_queues\":[", \
+			(available?"true":"false"), tc, ts, (available?(npu?"true":"false"):"null")
 
 		for(i=0;i<tq_n;i++) {
 			if(i>0) printf ","
@@ -517,7 +559,7 @@ get_token_info() {
 
 		printf "],\"station_counts\":[%s]}", stations
 	}
-	' "$token_file" 2>/dev/null || printf '{"token_count":0,"token_size":0,"npu_active":false,"tx_queues":[],"station_counts":[%s]}' "$sta_json"
+	' "$token_file" 2>/dev/null || printf '{"available":false,"token_count":null,"token_size":null,"npu_active":null,"tx_queues":[],"station_counts":[%s]}' "$sta_json"
 	rm -f "$token_file"
 }
 
@@ -692,49 +734,26 @@ get_apmode_offload() {
 }
 
 get_device_mode() {
-	local mode="router"
-	local reason=""
+	local interface wan_status up l3_device ipv4 ipv6 reason="no_active_wan"
 
-	# Primary check: has the user explicitly configured this as a dumb AP?
-	local dhcp_ignore
-	dhcp_ignore=$(uci get dhcp.lan.ignore 2>/dev/null)
-	if [ "$dhcp_ignore" = "1" ]; then
-		mode="ap"
-		reason="dhcp_disabled"
-	fi
+	# The default network creates independent DHCP and DHCPv6 interfaces.
+	# IPv4 can be down while wan6 still routes traffic on the same device.
+	for interface in wan wan6; do
+		wan_status=$(ubus call "network.interface.$interface" status 2>/dev/null)
+		up=$(printf '%s' "$wan_status" | jsonfilter -e '@.up' 2>/dev/null)
+		[ "$up" = "true" ] || continue
 
-	# Secondary check: is the WAN interface up with a real IP?
-	if [ "$mode" = "router" ]; then
-		local wan_up wan_ip
-		wan_up=$(ubus call network.interface.wan status 2>/dev/null | jsonfilter -e "@.up" 2>/dev/null)
-		wan_ip=$(ubus call network.interface.wan status 2>/dev/null | jsonfilter -e "@['ipv4-address'][0].address" 2>/dev/null)
-		if [ "$wan_up" != "true" ] || [ -z "$wan_ip" ]; then
-			mode="ap"
-			reason="no_wan"
+		l3_device=$(printf '%s' "$wan_status" | jsonfilter -e '@.l3_device' 2>/dev/null)
+		ipv4=$(printf '%s' "$wan_status" | jsonfilter -e "@['ipv4-address'][0].address" 2>/dev/null)
+		ipv6=$(printf '%s' "$wan_status" | jsonfilter -e "@['ipv6-address'][0].address" 2>/dev/null)
+		if [ -n "$l3_device$ipv4$ipv6" ]; then
+			printf '{"mode":"router","reason":"active_wan"}'
+			return
 		fi
-	fi
+	done
 
-	# Fallback: check if default route points to a local gateway (upstream router)
-	if [ "$mode" = "router" ]; then
-		local gw
-		gw=$(ip route show default 2>/dev/null | awk '/default via/{print $3; exit}')
-		if [ -n "$gw" ]; then
-			# If gateway is in 192.168.x.x or 10.x.x.x range, we're behind another router
-			case "$gw" in
-				192.168.*.*|10.*.*.*)
-					# Only treat as AP if we have no public WAN IP
-					local wan_ip2
-					wan_ip2=$(ubus call network.interface.wan status 2>/dev/null | jsonfilter -e "@['ipv4-address'][0].address" 2>/dev/null)
-					if [ -z "$wan_ip2" ]; then
-						mode="ap"
-						reason="local_gateway"
-					fi
-					;;
-			esac
-		fi
-	fi
-
-	printf '{"mode":"%s","reason":"%s"}' "$mode" "$reason"
+	[ "$(uci get dhcp.lan.ignore 2>/dev/null)" = "1" ] && reason="dhcp_disabled"
+	printf '{"mode":"ap","reason":"%s"}' "$reason"
 }
 
 
@@ -779,11 +798,21 @@ get_wan_health() {
 
 get_jitter_result() {
 	local result_file="/tmp/npu-jitter.json"
-	if [ -f "$result_file" ]; then
-		cat "$result_file"
-	else
-		echo '{"jitter":0,"last_ping":0,"samples":0,"target":"223.5.5.5","reachable":false,"available":false}'
+	local result target
+
+	# Read one snapshot. Older daemons may still truncate the file while
+	# this request runs; never splice an empty/partial JSON value into RPC.
+	if [ -s "$result_file" ]; then
+		result=$(jsonfilter -i "$result_file" -e '@' 2>/dev/null)
+		if [ "$(printf '%s' "$result" | jsonfilter -e '@.available' 2>/dev/null)" = "true" ]; then
+			printf '%s' "$result"
+			return
+		fi
 	fi
+
+	target=$(uci get npu-monitor.@jitter[0].target 2>/dev/null)
+	_valid_ping_target "$target" || target="223.5.5.5"
+	printf '{"jitter":0,"last_ping":0,"samples":0,"target":"%s","reachable":false,"available":false}' "$target"
 }
 
 get_wifi_stats() {
@@ -1130,9 +1159,16 @@ get_conflict_alerts() {
 
 get_eth_stats() {
 	printf '{"ports":['
-	local first=1
-	for iface in wan lan1 lan2 lan3 lan4; do
-		local sys="/sys/class/net/$iface"
+	local first=1 interfaces entry device iface
+	case "$(board_name 2>/dev/null)" in
+	gemtek,w1700k-ubi) interfaces="eth1:wan eth2:lan2 lan3:lan3 lan4:lan4" ;;
+	gemtek,xr1710g-ubi) interfaces="eth1:wan eth2:lan1 lan2:lan2 lan3:lan3" ;;
+	*) interfaces="wan:wan lan1:lan1 lan2:lan2 lan3:lan3 lan4:lan4" ;;
+	esac
+	for entry in $interfaces; do
+		device=${entry%%:*}
+		iface=${entry#*:}
+		local sys="/sys/class/net/$device"
 		[ -d "$sys" ] || continue
 		local operstate up=false
 		operstate=$(cat "$sys/operstate" 2>/dev/null || echo "unknown")
@@ -1146,8 +1182,8 @@ get_eth_stats() {
 		tx_errors=$(cat "$sys/statistics/tx_errors" 2>/dev/null || echo 0)
 		rx_errors=$(cat "$sys/statistics/rx_errors" 2>/dev/null || echo 0)
 		[ "$first" = "1" ] || printf ","
-		printf '{"iface":"%s","up":%s,"speed":%d,"tx_bytes":%d,"rx_bytes":%d,"tx_errors":%d,"rx_errors":%d}' \
-			"$iface" "$up" "$speed" "$tx_bytes" "$rx_bytes" "$tx_errors" "$rx_errors"
+		printf '{"iface":"%s","device":"%s","up":%s,"speed":%d,"tx_bytes":%d,"rx_bytes":%d,"tx_errors":%d,"rx_errors":%d}' \
+			"$iface" "$device" "$up" "$speed" "$tx_bytes" "$rx_bytes" "$tx_errors" "$rx_errors"
 		first=0
 	done
 	printf ']}'
@@ -1156,20 +1192,34 @@ get_eth_stats() {
 get_ping_target() {
 	local target
 	target=$(uci get npu-monitor.@jitter[0].target 2>/dev/null || echo "223.5.5.5")
+	_valid_ping_target "$target" || target="223.5.5.5"
 	printf '{"target":"%s"}' "$target"
+}
+
+_valid_ping_target() {
+	# The daemon embeds this value in JSON and passes it to ping.
+	case "$1" in
+		''|-*|*[!A-Za-z0-9.:_-]*) return 1 ;;
+	esac
+	[ "${#1}" -le 253 ]
 }
 
 set_ping_target() {
 	local input target
 	input=$(cat 2>/dev/null)
 	target=$(echo "$input" | jsonfilter -e '@.target' 2>/dev/null)
-	if [ -z "$target" ]; then
-		echo '{"error":"Missing target parameter"}'
+	if ! _valid_ping_target "$target"; then
+		echo '{"error":"Invalid ping target: use an IP address or hostname up to 253 characters"}'
 		return
 	fi
-	uci set npu-monitor.@jitter[0].target="$target"
-	uci commit npu-monitor
-	/etc/init.d/npu-jitter restart 2>/dev/null
+	if ! uci set npu-monitor.@jitter[0].target="$target" || ! uci commit npu-monitor; then
+		echo '{"error":"Failed to save ping target"}'
+		return
+	fi
+	if ! /etc/init.d/npu-jitter restart >/dev/null 2>&1; then
+		echo '{"error":"Ping target saved, but monitor restart failed"}'
+		return
+	fi
 	printf '{"success":true,"target":"%s"}' "$target"
 }
 
