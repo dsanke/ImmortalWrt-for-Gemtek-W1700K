@@ -18,6 +18,10 @@ define feedname
 $(if $(patsubst feeds/%,,$(1)),,$(word 2,$(subst /, ,$(1))))
 endef
 
+define scandir
+$(if $(wildcard $(SCAN_DIR)/$(1)/Makefile),$(SCAN_DIR)/$(1),$(SCAN_DIR))
+endef
+
 ifeq ($(SCAN_NAME),target)
   SCAN_DEPS=image/Makefile profiles/*.mk $(TOPDIR)/include/kernel*.mk $(TOPDIR)/include/target.mk image/*.mk
 else
@@ -45,16 +49,16 @@ endif
 
 define PackageDir
   $(TMP_DIR)/.$(SCAN_TARGET): $(TMP_DIR)/info/.$(SCAN_TARGET)-$(1)
-  $(TMP_DIR)/info/.$(SCAN_TARGET)-$(1): $(SCAN_DIR)/$(2)/Makefile $(foreach DEP,$(DEPS_$(SCAN_DIR)/$(2)/Makefile) $(SCAN_DEPS),$(wildcard $(if $(filter /%,$(DEP)),$(DEP),$(SCAN_DIR)/$(2)/$(DEP))))
+  $(TMP_DIR)/info/.$(SCAN_TARGET)-$(1): $(call scandir,$(2))/Makefile $(foreach DEP,$(DEPS_$(call scandir,$(2))/Makefile) $(SCAN_DEPS),$(wildcard $(if $(filter /%,$(DEP)),$(DEP),$(call scandir,$(2))/$(DEP))))
 	{ \
-		$$(call progress,Collecting $(SCAN_NAME) info: $(SCAN_DIR)/$(2)) \
-		echo Source-Makefile: $(SCAN_DIR)/$(2)/Makefile; \
+		$$(call progress,Collecting $(SCAN_NAME) info: $(call scandir,$(2))) \
+		echo Source-Makefile: $(call scandir,$(2))/Makefile; \
 		$(if $(3),echo Override: $(3),true); \
-		$(if $(findstring c,$(OPENWRT_VERBOSE)),$(MAKE),$(NO_TRACE_MAKE) --no-print-dir) -r DUMP=1 FEED="$(call feedname,$(2))" -C $(SCAN_DIR)/$(2) $(SCAN_MAKEOPTS) \
+		$(if $(findstring c,$(OPENWRT_VERBOSE)),$(MAKE),$(NO_TRACE_MAKE) --no-print-dir) -r DUMP=1 FEED="$(call feedname,$(2))" -C $(call scandir,$(2)) $(SCAN_MAKEOPTS) \
 			$(if $(findstring c,$(OPENWRT_VERBOSE)),,2>/dev/null) || { \
-			mkdir -p "$(TOPDIR)/logs/$(SCAN_DIR)/$(2)"; \
-			$(NO_TRACE_MAKE) --no-print-dir -r DUMP=1 FEED="$(call feedname,$(2))" -C $(SCAN_DIR)/$(2) $(SCAN_MAKEOPTS) > $(TOPDIR)/logs/$(SCAN_DIR)/$(2)/dump.txt 2>&1; \
-			$$(call progress,ERROR: please fix $(SCAN_DIR)/$(2)/Makefile - see logs/$(SCAN_DIR)/$(2)/dump.txt for details\n) \
+			mkdir -p "$(TOPDIR)/logs/$(call scandir,$(2))"; \
+			$(NO_TRACE_MAKE) --no-print-dir -r DUMP=1 FEED="$(call feedname,$(2))" -C $(call scandir,$(2)) $(SCAN_MAKEOPTS) > $(TOPDIR)/logs/$(call scandir,$(2))/dump.txt 2>&1; \
+			$$(call progress,ERROR: please fix $(call scandir,$(2))/Makefile - see logs/$(call scandir,$(2))/dump.txt for details\n) \
 			rm -f $$@; \
 		}; \
 		echo; \
@@ -74,11 +78,11 @@ endif
 
 $(FILELIST): $(OVERRIDELIST)
 	rm -f $(TMP_DIR)/info/.files-$(SCAN_TARGET)-*
-	find -L $(SCAN_DIR) -mindepth 1 $(if $(SCAN_DEPTH),-maxdepth $(SCAN_DEPTH)) $(SCAN_EXTRA) -name Makefile | xargs grep -aHE 'call $(GREP_STRING)' | sed -e 's#^$(SCAN_DIR)/##' -e 's#/Makefile:.*##' | uniq | awk -v of=$(OVERRIDELIST) -f include/scan.awk > $@
+	find -L $(SCAN_DIR) -mindepth 1 $(if $(SCAN_DEPTH),-maxdepth $(SCAN_DEPTH)) $(SCAN_EXTRA) -name Makefile | xargs grep -aHE 'call $(GREP_STRING)' | sed -e 's#^$(SCAN_DIR)/##' -e 's#/Makefile:.*##' -e 's#^Makefile:.*#$(notdir $(SCAN_DIR))#' | uniq | awk -v of=$(OVERRIDELIST) -f include/scan.awk > $@
 
 $(TMP_DIR)/info/.files-$(SCAN_TARGET).mk: $(FILELIST)
 	( \
-		cat $< | awk '{print "$(SCAN_DIR)/" $$0 "/Makefile" }' | xargs grep -HE '^ *SCAN_DEPS *= *' | awk -F: '{ gsub(/^.*DEPS *= */, "", $$2); print "DEPS_" $$1 "=" $$2 }'; \
+		cat $< | awk '{print "$(SCAN_DIR)/" $$0 "/Makefile" }' | xargs grep -sHE '^ *SCAN_DEPS *= *' | awk -F: '{ gsub(/^.*DEPS *= */, "", $$2); print "DEPS_" $$1 "=" $$2 }'; \
 		awk -F/ -v deps="$$DEPS" -v of="$(OVERRIDELIST)" ' \
 		BEGIN { \
 			while (getline < (of)) \
