@@ -130,7 +130,8 @@
 **系统工具**
 - `bash` / `coreutils` / `curl` / `ip-full`
 - `ethtool-full` / `pciutils` / `uboot-envtools`
-- `luci-theme-argon` + `luci-theme-bootstrap`
+- `luci-theme-aurora`（默认）+ `luci-app-aurora-config`
+- `luci-theme-argon` / `luci-theme-bootstrap` / `luci-theme-glass`（可切换）
 - `default-settings-chn`（中文默认设置）
 
 **代理与网络核心**
