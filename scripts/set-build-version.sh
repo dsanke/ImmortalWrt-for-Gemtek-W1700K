@@ -37,7 +37,7 @@ upstream_commit="${upstream_commit:-unknown}"
 build_id="${BUILD_ID:-${build_date}-${repo_commit}-${upstream_commit}}"
 version_number="${VERSION_NUMBER:-${build_id}}"
 version_code="${VERSION_CODE:-${repo_commit}-${upstream_commit}}"
-extra_image_name="${EXTRA_IMAGE_NAME:-${build_id}}"
+extra_image_name="${EXTRA_IMAGE_NAME-}"
 
 escape_config_string() {
 	printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'

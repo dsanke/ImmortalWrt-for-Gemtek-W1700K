@@ -1,4 +1,4 @@
-name: Build XR1710G Firmware
+name: Build W1700K Firmware
 
 on:
   workflow_dispatch:
@@ -56,13 +56,29 @@ jobs:
       - name: Setup build environment
         run: |
           sudo apt update
-          sudo apt install -y build-essential clang gcc g++ binutils bzip2 gawk gettext git libncurses-dev libssl-dev python3 python3-setuptools rsync unzip wget xsltproc zlib1g-dev file which perl sed make
+          # CONFIG_BPF_TOOLCHAIN_HOST=y uses the host clang/llvm-strip pair.
+          # llvm-strip is shipped by the llvm package, not by clang.
+          sudo apt install -y build-essential clang llvm gcc g++ binutils bzip2 gawk gettext git libncurses-dev libssl-dev python3 python3-setuptools rsync unzip wget xsltproc zlib1g-dev file which perl sed make
 
       - name: Install feeds
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
           bash scripts/fix-stale-golang-host.sh
+
+      - name: Apply W1700K feed patches (AdGuardHome no-autostart)
+        run: |
+          git -C feeds/packages apply --check "$GITHUB_WORKSPACE/patches/packages/0200-adguardhome-do-not-autostart-unconfigured.patch"
+          git -C feeds/packages apply "$GITHUB_WORKSPACE/patches/packages/0200-adguardhome-do-not-autostart-unconfigured.patch"
+
+      - name: Install daede optimized dae/daed
+        run: |
+          # The packages feed ships upstream dae/daed.  The daede feed
+          # (src-git daede) provides the optimized dae/daed (performance
+          # fork, QUIC/PGO patches) plus luci-app-daede, so drop the
+          # upstream copies and install the daede ones.
+          rm -rf package/feeds/packages/dae package/feeds/packages/daed
+          ./scripts/feeds install -a -p daede
 
       - name: Configure
         run: |
@@ -75,6 +91,8 @@ jobs:
           VERSION_CODE='${{ steps.version.outputs.version_code }}' \
           bash scripts/set-build-version.sh .config
           make defconfig
+          # Keep image filenames concise: version number only, no revision/extra suffix
+          sed -i -e 's/^CONFIG_VERSION_CODE_FILENAMES=y$/# CONFIG_VERSION_CODE_FILENAMES is not set/' .config
           grep -E 'CONFIG_(IMAGEOPT|EXTRA_IMAGE_NAME|VERSIONOPT|VERSION_DIST|VERSION_NUMBER|VERSION_CODE)=' .config
 
       - name: Download sources
@@ -104,7 +122,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: xr1710g-firmware
+          name: w1700k-firmware
           path: |
             build.log
             bin/targets/airoha/an7581/*.itb
@@ -141,7 +159,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ format('{0}-{1}', steps.version.outputs.date, steps.version.outputs.repo_commit) }}
-          name: ${{ format('{0} - XR1710G Build ({1})', steps.version.outputs.date, steps.version.outputs.repo_commit) }}
+          name: ${{ format('{0} - W1700K Build ({1})', steps.version.outputs.date, steps.version.outputs.repo_commit) }}
           body: ${{ steps.release_body.outputs.body }}
           draft: false
           prerelease: ${{ github.event.inputs.release_type == 'prerelease' }}
