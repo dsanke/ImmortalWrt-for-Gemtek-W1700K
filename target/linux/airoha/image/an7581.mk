@@ -71,7 +71,7 @@ define Device/airoha_an7581-evb-emmc-eagle
   DEVICE_MODEL := AN7581 Evaluation Board (eMMC + Eagle)
   DEVICE_DTS := an7581-evb-emmc-eagle
   DEVICE_PACKAGES := airoha-en7581-mt7996-npu-firmware \
-		    kmod-mt7996-firmware wpad-openssl
+		    kmod-mt7996-firmware wpad-basic-mbedtls
   ARTIFACT/preloader.bin := an7581-preloader rfb
   ARTIFACT/bl31-uboot.fip := an7581-bl31-uboot rfb
   ARTIFACTS := preloader.bin bl31-uboot.fip
@@ -83,7 +83,7 @@ define Device/airoha_an7581-evb-emmc-kite
   DEVICE_MODEL := AN7581 Evaluation Board (eMMC + Kite)
   DEVICE_DTS := an7581-evb-emmc-kite
   DEVICE_PACKAGES := airoha-en7581-npu-firmware \
-		    kmod-mt7992-firmware wpad-openssl
+		    kmod-mt7992-firmware wpad-basic-mbedtls
   ARTIFACT/preloader.bin := an7581-preloader rfb
   ARTIFACT/bl31-uboot.fip := an7581-bl31-uboot rfb
   ARTIFACTS := preloader.bin bl31-uboot.fip
@@ -103,15 +103,14 @@ define Device/gemtek_w1700k-ubi
   DEVICE_ALT2_VENDOR := Quantum Fiber
   DEVICE_ALT2_MODEL := W1700K
   DEVICE_ALT2_VARIANT := UBI
-  SUPPORTED_DEVICES := gemtek,w1700k-ubi
   DEVICE_DTS := an7581-w1700k-ubi
   DEVICE_COMPAT_VERSION := 2.0
   DEVICE_COMPAT_MESSAGE := Partition table has been changed to cooperate \
        with the vendor bootloader with regard to the BMT/BBT partition at \
        the end of flash. A reinstall including corrected chainloader is needed.
-  DEVICE_PACKAGES := airoha-en7581-mt7996-npu-firmware fitblk \
-		    kmod-hwmon-nct7802 kmod-mt7996-firmware wpad-openssl \
-		    rtl826x-firmware px5g-mbedtls
+  DEVICE_PACKAGES := airoha-en7581-mt7996-npu-firmware ethtool-full fitblk \
+		    kmod-i2c-an7581 kmod-hwmon-nct7802 kmod-mt7996-firmware \
+		    kmod-phy-realtek uboot-envtools wpad-mbedtls rtl826x-firmware
   UBINIZE_OPTS := -E 5
   BLOCKSIZE := 128k
   PAGESIZE := 2048
@@ -123,8 +122,6 @@ define Device/gemtek_w1700k-ubi
   KERNEL_INITRAMFS_SUFFIX := -recovery.itb
   IMAGES := sysupgrade.itb
   IMAGE/sysupgrade.itb := append-kernel | fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-static-with-rootfs | append-metadata
-  ARTIFACTS := chainload-uboot.itb
-  ARTIFACT/chainload-uboot.itb := an7581-chainloader gemtek_w1700k
   SOC := an7581
 endef
 TARGET_DEVICES += gemtek_w1700k-ubi
@@ -136,18 +133,43 @@ define Device/gemtek_xr1710g-ubi
   DEVICE_ALT0_VENDOR := Brightspeed
   DEVICE_ALT0_MODEL := XR1710G
   DEVICE_ALT0_VARIANT := UBI
-  SUPPORTED_DEVICES := gemtek,xr1710g-ubi
   DEVICE_DTS := an7581-xr1710g-ubi
-  DEVICE_PACKAGES := airoha-en7581-mt7996-npu-firmware fitblk uboot-envtools kmod-i2c-an7581 \
-		    kmod-hwmon-nct7802 kmod-mt7996-firmware wpad-mbedtls \
-		    rtl826x-firmware px5g-mbedtls
+  SUPPORTED_DEVICES += econet,xr1710g-ubi
+  DEVICE_COMPAT_VERSION := 2.0
+  DEVICE_COMPAT_MESSAGE := The XR1710G BMT/BBT boundary has changed. Install \
+       an XR1710G chainloader/U-Boot using the new layout first, then boot \
+       recovery/initramfs and fully recreate UBI. A normal sysupgrade that \
+       preserves configuration is unsafe.
+  DEVICE_PACKAGES := -airoha-en7581-npu-firmware \
+		    -kmod-input-gpio-keys-polled -kmod-leds-pwm \
+		    -kmod-pwm-airoha \
+		    airoha-en7581-mt7996-npu-firmware \
+		    apk-mbedtls ethtool-full fitblk \
+		    ip-bridge ip-full iperf3 mdio-tools openssh-sftp-server phytool tcpdump \
+		    kmod-i2c-an7581 kmod-hwmon-nct7802 \
+		    kmod-mt7996-firmware kmod-phy-realtek \
+		    kmod-airoha-net-debug rtl826x-firmware \
+		    luci \
+		    luci-app-firewall luci-app-mlo \
+		    luci-app-package-manager \
+		    luci-i18n-airoha-npu-zh-cn \
+		    luci-i18n-base-zh-cn \
+		    luci-i18n-firewall-zh-cn \
+		    luci-i18n-glass-zh-cn \
+		    luci-i18n-mlo-zh-cn \
+		    luci-i18n-package-manager-zh-cn \
+		    luci-mod-admin-full \
+		    luci-proto-ppp luci-theme-bootstrap luci-theme-glass \
+		    rpcd-mod-rrdns uhttpd uhttpd-mod-ubus \
+		    wpad-basic-mbedtls
   UBINIZE_OPTS := -E 5
   BLOCKSIZE := 128k
   PAGESIZE := 2048
   UBOOTENV_IN_UBI := 1
   KERNEL_IN_UBI := 1
   KERNEL := kernel-bin | gzip
-  KERNEL_INITRAMFS := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 128k
+  KERNEL_INITRAMFS := kernel-bin | lzma | \
+	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 128k
   KERNEL_INITRAMFS_SUFFIX := -recovery.itb
   IMAGES := sysupgrade.itb
   IMAGE/sysupgrade.itb := append-kernel | fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-static-with-rootfs | append-metadata
@@ -161,7 +183,7 @@ define Device/nokia_valyrian
   DEVICE_DTS := an7581-nokia-valyrian
   DEVICE_PACKAGES := kmod-spi-gpio kmod-gpio-nxp-74hc164 kmod-leds-gpio \
     kmod-i2c-gpio kmod-iio-richtek-rtq6056 \
-    kmod-sfp aeonsemi-as21xxx-firmware \
+    kmod-sfp kmod-phy-aeonsemi-as21xxx \
     kmod-mt7996-firmware airoha-en7581-mt7996-npu-firmware \
     kmod-usb3
   ARTIFACT/preloader.bin := an7581-preloader nokia_valyrian

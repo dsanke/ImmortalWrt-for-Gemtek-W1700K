@@ -1,0 +1,34 @@
+diff --git a/src/ap/dfs.c b/src/ap/dfs.c
+index d72c8dd..e8ef02c 100644
+--- a/src/ap/dfs.c
++++ b/src/ap/dfs.c
+@@ -804,6 +804,10 @@ static int dfs_are_channels_overlapped(struct hostapd_iface *iface, int freq,
+ }
+ 
+ 
++/* Laboratory/development builds cap the DFS CAC wait at 10 s instead of
++ * the regulatory 60 s so radar channels become usable quickly. */
++#define DFS_CAC_LAB_MAX_MS 10000
++
+ static unsigned int dfs_get_cac_time(struct hostapd_iface *iface,
+ 				     int start_chan_idx, int n_chans)
+ {
+@@ -824,6 +828,9 @@ static unsigned int dfs_get_cac_time(struct hostapd_iface *iface,
+ 			cac_time_ms = channel->dfs_cac_ms;
+ 	}
+ 
++	if (cac_time_ms > DFS_CAC_LAB_MAX_MS)
++		cac_time_ms = DFS_CAC_LAB_MAX_MS;
++
+ 	return cac_time_ms;
+ }
+ 
+@@ -1650,7 +1657,7 @@ int hostapd_dfs_start_cac(struct hostapd_data *hapd, int freq,
+ 			ieee802_11_set_beacons(iface);
+ 	}
+ 	/* TODO: How to check CAC time for ETSI weather channels? */
+-	iface->dfs_cac_ms = 60000;
++	iface->dfs_cac_ms = DFS_CAC_LAB_MAX_MS;
+ 	wpa_msg(hapd->msg_ctx, MSG_INFO, DFS_EVENT_CAC_START
+ 		"freq=%d chan=%d chan_offset=%d width=%d seg0=%d "
+ 		"seg1=%d cac_time=%ds%s",
