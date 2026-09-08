@@ -30,6 +30,20 @@
 			reg = <0x0 0x84000000 0x0 0xa00000>;
 		};
 
+		npu_mbox: npu-mbox@84a00000 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x0 0x84a00000 0x0 0x1000000>;
+		};
+
+		/* 64 KiB reserved for ramoops/pstore */
+		ramoops@86ff0000 {
+			no-map;
+			compatible = "ramoops";
+			reg = <0x0 0x86ff0000 0x0 0x10000>;
+			record-size = <0x1000>;
+		};
+
 		qdma0_buf: qdma0-buf@87000000 {
 			no-map;
 			reg = <0x0 0x87000000 0x0 0x2000000>;
@@ -136,6 +150,9 @@
 	};
 
 	cpufreq: cpufreq {
+		reg = <0x0 0x1fa20000 0x0 0x2c0>,
+		      <0x0 0x1efbe000 0x0 0x800>;
+		reg-names = "chip-scu", "mcucfg";
 		compatible = "airoha,en7581-cpufreq";
 
 		operating-points-v2 = <&cpu_smcc_opp_table>;
@@ -446,6 +463,7 @@
 
 		pon_pcs: pcs@1fa08000 {
 			compatible = "airoha,an7581-pcs-pon";
+			#pcs-cells = <0>;
 			reg = <0x0 0x1fa08000 0x0 0x1000>,
 			      <0x0 0x1fa80000 0x0 0x60>,
 			      <0x0 0x1fa80a00 0x0 0x164>,
@@ -463,12 +481,11 @@
 			reset-names = "mac", "phy";
 
 			airoha,scu = <&scuclk>;
-
-			#pcs-cells = <0>;
 		};
 
 		eth_pcs: pcs@1fa09000 {
 			compatible = "airoha,an7581-pcs-eth";
+			#pcs-cells = <0>;
 			reg = <0x0 0x1fa09000 0x0 0x1000>,
 			      <0x0 0x1fa70000 0x0 0x60>,
 			      <0x0 0x1fa70a00 0x0 0x164>,
@@ -486,8 +503,6 @@
 			reset-names = "mac", "phy";
 
 			airoha,scu = <&scuclk>;
-
-			#pcs-cells = <0>;
 		};
 
 		pcie_pcs: pcs@1fa04000 {
@@ -562,10 +577,11 @@
 			airoha,chip-scu = <&chip_scu>;
 		};
 
-		rng@1faa1000 {
+		rng: rng@1faa1000 {
 			compatible = "airoha,en7581-trng";
 			reg = <0x0 0x1faa1000 0x0 0xc04>;
 			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+			airoha,scu = <&chip_scu>;
 		};
 
 		usb0: usb@1fab0000 {
@@ -619,6 +635,13 @@
 			reg = <0x0 0x1fb70000 0x0 0x1000>;
 
 			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		/* Packet/IPsec SOE register window owned by the Ethernet driver. */
+		soe: soe@1fbfa000 {
+			compatible = "airoha,an7581-soe";
+			reg = <0x0 0x1fbfa000 0x0 0x268>;
+			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
 		thermal: thermal-sensor@1efbd000 {
@@ -706,7 +729,7 @@
 			spi_nand: nand@0 {
 				compatible = "spi-nand";
 				reg = <0>;
-				spi-max-frequency = <50000000>;
+				spi-max-frequency = <33000000>;
 				spi-tx-bus-width = <1>;
 				spi-rx-bus-width = <2>;
 			};
@@ -893,9 +916,8 @@
 				     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
-			memory-region = <&npu_binary>;
-			memory-region-names = "binary";
-
+			memory-region = <&npu_binary>, <&npu_mbox>;
+			memory-region-names = "binary", "mbox";
 			status = "disabled";
 		};
 
@@ -927,7 +949,15 @@
 				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-				     <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
+				     <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 210 IRQ_TYPE_LEVEL_HIGH>;
 
 			memory-region = <&qdma0_buf>, <&qdma1_buf>;
 			memory-region-names = "qdma0-buf", "qdma1-buf";

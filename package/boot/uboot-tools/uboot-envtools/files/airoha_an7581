@@ -2,34 +2,53 @@
 # Copyright (C) 2025 OpenWrt.org
 #
 
+. /lib/functions.sh
+. /lib/uboot-envtools.sh
+
+board=$(board_name)
+
+# The Gemtek XR1710G / W1700K HTTP-recovery chainloader U-Boot uses
+# CONFIG_ENV_SIZE=0x4000 for its redundant UBI environment.  A preserved
+# config from an older image may point at the correct dynamic UBI volumes
+# while still using the incompatible generic 0x1f000 size, which makes
+# fw_setenv write an environment whose CRC the U-Boot rejects.  Drop the
+# stale files so the exact redundant 0x4000 layout is regenerated below.
+case "$board" in
+gemtek,w1700k-ubi|\
+gemtek,xr1710g-ubi)
+	if [ -e /etc/config/ubootenv ] && [ -e /etc/fw_env.config ] &&
+		[ "$(grep -Ec '^/dev/ubi[0-9]+_[0-9]+[[:space:]]+0x0[[:space:]]+0x4000[[:space:]]+0x1f000[[:space:]]+1$' /etc/fw_env.config)" -eq 2 ]; then
+		exit 0
+	fi
+	rm -f /etc/config/ubootenv /etc/fw_env.config /etc/fw_sys.config
+	;;
+esac
+
+# Other boards keep the existing behavior: an already generated config is
+# left untouched.
 [ -e /etc/config/ubootenv ] && exit 0
 
 touch /etc/config/ubootenv
 
-. /lib/uboot-envtools.sh
-. /lib/functions.sh
-
-board=$(board_name)
-
-ubootenv_add_ubi_xr1710g() {
+ubootenv_add_ubi_http_recovery() {
 	. /lib/upgrade/nand.sh
 	local envubi="$(nand_find_ubi ubi)"
 	local dev="/dev/$(nand_find_volume "$envubi" ubootenv)"
 	local dev2="/dev/$(nand_find_volume "$envubi" ubootenv2)"
 
-	# The XR1710G chainloader U-Boot (YYH2913/http-uboot-xr1710g) uses
+	# The Gemtek XR1710G / W1700K HTTP-recovery chainloader U-Boot uses
 	# CONFIG_ENV_SIZE=0x4000 for its redundant UBI environment.  Using the
-	# generic 0x1f000 layout makes fw_setenv write an environment whose CRC
+	# generic 0x1f000 size makes fw_setenv write an environment whose CRC
 	# the U-Boot rejects, so bootcmd changes never take effect.
 	ubootenv_add_uci_config "$dev" "0x0" "0x4000" "0x1f000" "1"
 	ubootenv_add_uci_config "$dev2" "0x0" "0x4000" "0x1f000" "1"
 }
 
 case "$board" in
-gemtek,xr1710g-ubi)
-	ubootenv_add_ubi_xr1710g
-	;;
 gemtek,w1700k-ubi|\
+gemtek,xr1710g-ubi)
+	ubootenv_add_ubi_http_recovery
+	;;
 nokia,xg-040g-md-ubi)
 	ubootenv_add_ubi_default
 	;;

@@ -484,8 +484,6 @@
 
 	nvmem-cells = <&mac_factory_2c0000 4>;
 	nvmem-cell-names = "mac-address";
-
-	openwrt,netdev-name = "wan";
 };
 
 &eth_pcs {
@@ -494,6 +492,7 @@
 
 &gdm4 {
 	status = "okay";
+	airoha,lan-port;
 
 	managed = "in-band-status";
 	phy-handle = <&as21xx>;
@@ -501,8 +500,6 @@
 
 	nvmem-cells = <&mac_factory_2c0000 5>;
 	nvmem-cell-names = "mac-address";
-
-	openwrt,netdev-name = "10g";
 };
 
 &gsw_port1 {
