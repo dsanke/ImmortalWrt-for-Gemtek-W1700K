@@ -1,16 +1,16 @@
 <img src="https://avatars.githubusercontent.com/u/53193414?s=200&v=4" alt="logo" width="200" height="200" align="right">
 
-# ImmortalWrt for Gemtek W1700K / XR1710G
+# ImmortalWrt for Gemtek W1700K
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/naoki66/ImmortalWrt-for-Gemtek-XR1710G/build-firmware.yml?branch=master&label=Build)](https://github.com/naoki66/ImmortalWrt-for-Gemtek-XR1710G/actions/workflows/build-firmware.yml)
-[![Sync Status](https://img.shields.io/github/actions/workflow/status/naoki66/ImmortalWrt-for-Gemtek-XR1710G/sync-upstream.yml?branch=master&label=Sync)](https://github.com/naoki66/ImmortalWrt-for-Gemtek-XR1710G/actions/workflows/sync-upstream.yml)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/dsanke/ImmortalWrt-for-Gemtek-W1700K/build-firmware.yml?branch=master&label=Build)](https://github.com/dsanke/ImmortalWrt-for-Gemtek-W1700K/actions/workflows/build-firmware.yml)
+[![Sync Status](https://img.shields.io/github/actions/workflow/status/dsanke/ImmortalWrt-for-Gemtek-W1700K/sync-upstream.yml?branch=master&label=Sync)](https://github.com/dsanke/ImmortalWrt-for-Gemtek-W1700K/actions/workflows/sync-upstream.yml)
 [![Upstream](https://img.shields.io/badge/upstream-immortalwrt%409507037475-blue)](https://github.com/immortalwrt/immortalwrt)
 [![Synced](https://img.shields.io/badge/synced-2026--08--07%20merged-brightgreen)](#)
 [![Kernel](https://img.shields.io/badge/kernel-6.18.41-red)](https://www.kernel.org/)
 [![SoC](https://img.shields.io/badge/SoC-Airoha%20AN7581GT-orange)]()
 [![License](https://img.shields.io/badge/license-GPL--2.0-green)](https://spdx.org/licenses/GPL-2.0-only.html)
 
-基于 [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) 为 Gemtek XR1710G（Brightspeed XR1710G）与 W1700K（CenturyLink / Lumen / Quantum Fiber）路由器定制的固件。两者为同一 AN7581 平台姊妹机，共享内核补丁、无线栈与 LuCI 定制。
+基于 [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) 为 Gemtek W1700K（CenturyLink / Lumen / Quantum Fiber）路由器定制的固件。工程沿用 naoki66 的 XR1710G/AN7581 上游基础，共享内核补丁、无线栈与 LuCI 定制；本仓库 Release 只发布 W1700K 镜像。
 
 默认管理地址：http://192.168.50.1 或 http://immortalwrt.lan，用户名：**root**，密码：*无*。
 
@@ -40,7 +40,7 @@
 
 ### 核心定制
 
-- 独立 XR1710G 设备树 [an7581-xr1710g-ubi.dts](target/linux/airoha/dts/an7581-xr1710g-ubi.dts)（基于公共 `an7581.dtsi` 与 `an7581-npu-mt7996.dtsi` 扩展，含 PCIe 3.0 x2 模式配置）。
+- 独立 W1700K 设备树 [an7581-w1700k-ubi.dts](target/linux/airoha/dts/an7581-w1700k-ubi.dts)（基于公共 `an7581.dtsi` 与 `an7581-npu-mt7996.dtsi` 扩展，含 PCIe 3.0 x2 模式配置）。
 - 关键内核与网络补丁（完整列表见 [target/linux/airoha/patches-6.18/](target/linux/airoha/patches-6.18/) 和 [target/linux/generic/pending-6.18/](target/linux/generic/pending-6.18/)）：
   - `303-01/02`：MediaTek PHY 寄存器与校准支持。
   - `675-02~05`：nft_flow_offload 桥接、WDMA 与 VLAN-aware bridge/PVID 映射。
@@ -51,31 +51,37 @@
 - 无线栈补丁：
   - [mt76 patches](package/kernel/mt76/patches/) 中的 `001`（mt7996 PS sync TLV/MLO 稳定性）与 `9993`（operating-mode rate control）。
   - [mac80211 patch](package/kernel/mac80211/patches/subsys/411-mac80211-export-link-sta-capability-limits.patch) 与 [hostapd patches](package/network/services/hostapd/patches/)（6GHz、EHT、radio mask 及多 VAP 稳定性）。
-- 启动与设备定制：`03_wifi_defaults`（SSID、加密方式、US 区域码）、`03_wireless`（射频参数）、`18-xr1710g-firewall-defaults`（默认软件/硬件 flow offload）、`99-ppe-reload`（无线接口创建后重载防火墙）、`packet-steering.sh`（Wi-Fi worker/CPU 亲和性）、风扇服务、升级平台脚本，以及独立 [luci-app-airoha-recovery](package/luci-app-airoha-recovery/) U-Boot HTTP Recovery 页面。
+- 启动与设备定制：`03_wifi_defaults`（SSID、加密方式、区域码）、`03_wireless`（射频参数）、`14-airoha-hw-flow-offload`（默认软件/硬件 flow offload）、`15-w1700k-flow-offload`（WiFi 桥接后重载防火墙）、`50-nf-bridge-call` / `50-flow-offload-wifi`、`packet-steering.sh`（Wi-Fi worker/CPU 亲和性）、风扇服务、升级平台脚本，以及独立 [luci-app-airoha-recovery](package/luci-app-airoha-recovery/) U-Boot HTTP Recovery 页面。
 
 ### 网络与无线默认行为
 
 - 默认 LAN 地址为 `192.168.50.1`；IPv6 使用 SLAAC/EUI-64，关闭 DHCPv6/NDP 与 RA DNS/附加标志，减少国内网络环境下的兼容性问题。
 - 默认开启 firewall4 软件 flow offload 与硬件 flow offload；VLAN 标签卸载、PPPoE 透传卸载和 AP 模式加速可在 NPU 页面按需启用，并由 FlowSense 展示运行状态。
 - 三个无线射频默认启用：2.4GHz 为 HE20/自动信道/28dBm，5GHz 为 EHT160/信道 36/30dBm，6GHz 为 EHT320/信道 37/30dBm。
-- FlowSense 提供 Router/AP 模式、VLAN 标签/PPPoE 透传/AP 模式卸载状态与自定义 Ping 延迟检测；NPU 页面提供 PPE/Frame Engine、CPU 频率与安全超频控制；风扇页面提供实时温度、RPM/PWM 曲线与自定义曲线。
+- FlowSense 提供 Router/AP 模式、VLAN 标签/PPPoE 透传/AP 模式卸载状态与自定义 Ping 延迟检测；NPU 页面提供 PPE/Frame Engine、CPU 频率与加速开关；风扇页面提供实时温度、RPM/PWM 曲线与自定义曲线。
 
-### 预装 LuCI 应用（25 个，含中文界面）
+### 预装 LuCI 应用（31 个，含中文界面）
 
 #### 设备专属与仓库内置（来自 [package/](package/)）
 
 | 应用 | 来源 | 功能 |
 |------|------|------|
-| `luci-app-airoha-npu` | [rchen14b/luci-app-airoha-npu](https://github.com/rchen14b/luci-app-airoha-npu) | SoC/NPU 状态、加速开关与超频控制 |
+| `luci-app-airoha-npu` | [rchen14b/luci-app-airoha-npu](https://github.com/rchen14b/luci-app-airoha-npu) | SoC/NPU 状态、PPE/Frame Engine 与加速开关 |
 | `luci-app-airoha-fancontrol` | [Gilly1970/Gemtek-W1700K](https://github.com/Gilly1970/Gemtek-W1700K) | 风扇速度/温度控制与曲线 |
 | `luci-app-airoha-flowsense` | [Gilly1970/Gemtek-W1700K](https://github.com/Gilly1970/Gemtek-W1700K) | PPE 硬件 offload、VLAN 标签/PPPoE 透传/AP 模式卸载状态与延迟检测 |
 | `luci-app-airoha-recovery` | 本仓库 | 一键重启进入 U-Boot HTTP Recovery（一次性触发） |
+| `luci-app-aurora-config` | [eamonxg/luci-app-aurora-config](https://github.com/eamonxg/luci-app-aurora-config) | Aurora 主题配置界面 |
 | `luci-app-lucky` | [sirpdboy/luci-app-lucky](https://github.com/sirpdboy/luci-app-lucky) | Lucky（DDNS/反代/端口转发） |
 
-#### 网络与远程接入
+#### 网络、代理与远程接入
 
 | 应用 | 功能 |
 |------|------|
+| `luci-app-openclash` | OpenClash（Clash/Mihomo）代理客户端 |
+| `luci-app-passwall` | PassWall 代理客户端 |
+| `luci-app-smartdns` | SmartDNS 分流/加速控制 |
+| `luci-app-adguardhome` | AdGuard Home DNS 过滤/广告拦截 |
+| `luci-app-daede` | dae/daed eBPF 透明代理管理 |
 | `luci-app-zerotier` | ZeroTier 虚拟局域网 |
 | `luci-app-ddns-go` | DDNS-Go 动态域名（支持阿里云/Cloudflare/DNSPod） |
 | `luci-app-ddns` | 传统 DDNS 脚本 |
@@ -102,7 +108,7 @@
 | `luci-app-wechatpush` | 微信推送通知 |
 | `luci-app-wifihistory` | WiFi 历史记录 |
 
-> 为控制固件体积，当前不预装 `luci-app-openclash`、`luci-app-passwall`、`luci-app-adguardhome` 和 `luci-app-smartdns`；SmartDNS 核心及独立 UI 仍保留。
+> 以上代理/DNS 应用均随镜像预装；SmartDNS 同时包含 `smartdns-ui` 独立 UI，daede 使用优化版 `dae`/`daed` 后端。
 
 ### 主要系统包
 
@@ -113,6 +119,8 @@
 - `odhcp6c` / `odhcpd-ipv6only`（IPv6）
 - `ppp` / `ppp-mod-pppoe`（PPPoE）
 - `smartdns` + `smartdns-ui`（DNS 加速/分流）
+- `adguardhome`（DNS 过滤/广告拦截）
+- `dae` / `daed`（daede 优化版 eBPF 透明代理内核与 Dashboard 后端）
 - `wireguard-tools` + `luci-proto-wireguard` + `rpcd-mod-wireguard`（WireGuard）
 
 **内核模块（kmod）**
@@ -123,19 +131,20 @@
 - `kmod-br-netfilter` / `kmod-tcp-bbr`（桥接 Netfilter / BBR 拥塞控制）
 - `kmod-wireguard`（WireGuard 内核支持）
 - `kmod-hwmon-nct7802`（NCT7802 温度传感器）
-- `kmod-i2c-an7581` / `kmod-leds-gpio` / `kmod-gpio-button-hotplug`
+- `kmod-i2c-core` / `kmod-regmap-i2c` / `kmod-leds-gpio` / `kmod-gpio-button-hotplug`
 - `kmod-phy-realtek` / `kmod-mt76-connac` / `kmod-mt76-core`
 - `rtl826x-firmware`（RTL8261BE PHY 固件）
 
 **系统工具**
 - `bash` / `coreutils` / `curl` / `ip-full`
 - `ethtool-full` / `pciutils` / `uboot-envtools`
+- `ruby` / `ruby-yaml`（OpenClash 运行依赖）
 - `luci-theme-aurora`（默认）+ `luci-app-aurora-config`
 - `luci-theme-argon` / `luci-theme-bootstrap` / `luci-theme-glass`（可切换）
 - `default-settings-chn`（中文默认设置）
 
 **代理与网络核心**
-- `xray-core` / `simple-obfs-client`
+- `xray-core` / `simple-obfs-client` / `v2ray-geoip` / `v2ray-geosite`
 - `chinadns-ng` / `geoview` / `dns2socks` / `microsocks` / `ipt2socks`
 
 ## GitHub Actions 工作流
@@ -150,28 +159,28 @@
 
 **Release 格式**：
 - Tag：`YYYYMMDD-<short-hash>`
-- 名称：`YYYYMMDD - W1700K Build (<short-hash>)`（config.seed 已默认选中 `gemtek_w1700k-ubi`；如需构建 XR1710G，将 config.seed 中两个 `DEVICE_gemtek_*-ubi` 选项互换即可）
+- 名称：`YYYYMMDD - W1700K Build (<short-hash>)`（config.seed 默认选中 `gemtek_w1700k-ubi`，本仓库 Release 只发布 W1700K 镜像）
 - 选项：`release` / `prerelease` / `none`
 
 ## 下载
 
-- [Releases 页面](https://github.com/naoki66/ImmortalWrt-for-Gemtek-XR1710G/releases)
-- 固件文件（W1700K）：`immortalwrt-airoha-an7581-gemtek_w1700k-ubi-squashfs-sysupgrade.itb`
-- 固件文件（XR1710G）：`immortalwrt-airoha-an7581-gemtek_xr1710g-ubi-squashfs-sysupgrade.itb`
+- [Releases 页面](https://github.com/dsanke/ImmortalWrt-for-Gemtek-W1700K/releases)
+- 固件文件（W1700K）：`immortalwrt-naoki66-<YYYYMMDD>-<repo>-<upstream>-airoha-an7581-gemtek_w1700k-ubi-squashfs-sysupgrade.itb`
+- 当前最新：`immortalwrt-naoki66-20260910-5609398360-604e315e3c-airoha-an7581-gemtek_w1700k-ubi-squashfs-sysupgrade.itb`
 - 升级方法：LuCI → 系统 → 备份/升级 → 刷写固件
 
 ### 升级注意事项
 
 > [!WARNING]
 > LuCI 中的“保留配置”不会保留额外安装的软件包。升级前请备份配置并记录已安装的软件包；升级后需要
-> 重新安装 OpenClash、PassWall、AdGuard Home 等非预装组件。请使用与新固件匹配的软件包，不要恢复
+> 重新安装自行添加的组件。请使用与新固件匹配的软件包，不要恢复
 > 旧固件的 `kmod-*` 内核模块。
 
 ## 本地构建（可选）
 
 ```bash
-git clone https://github.com/naoki66/ImmortalWrt-for-Gemtek-XR1710G.git
-cd ImmortalWrt-for-Gemtek-XR1710G
+git clone https://github.com/dsanke/ImmortalWrt-for-Gemtek-W1700K.git
+cd ImmortalWrt-for-Gemtek-W1700K
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 bash scripts/fix-stale-golang-host.sh
