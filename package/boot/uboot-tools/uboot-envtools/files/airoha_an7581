@@ -23,29 +23,44 @@ ubootenv_add_ubi_xr1710g() {
 	local dev="/dev/$(nand_find_volume "$envubi" ubootenv)"
 	local dev2="/dev/$(nand_find_volume "$envubi" ubootenv2)"
 
-	# The XR1710G chainloader U-Boot (YYH2913/http-uboot-xr1710g) uses
-	# CONFIG_ENV_SIZE=0x4000 for its redundant UBI environment.  Using the
-	# generic 0x1f000 layout makes fw_setenv write an environment whose CRC
-	# the U-Boot rejects, so bootcmd changes never take effect.
+	# The legacy XR1710G chainloader U-Boot uses CONFIG_ENV_SIZE=0x4000 for
+	# its redundant UBI environment. Using the generic 0x1f000 layout makes
+	# fw_setenv write an environment whose CRC the U-Boot rejects.
 	ubootenv_add_uci_config "$dev" "0x0" "0x4000" "0x1f000" "1"
 	ubootenv_add_uci_config "$dev2" "0x0" "0x4000" "0x1f000" "1"
 }
+
+ubootenv_add_ubi_http_recovery() {
+	ubootenv_add_ubi_xr1710g
+}
+
+# W1700K keeps the legacy HTTP-recovery chainloader environment. Drop stale
+# files from older images so the exact redundant 0x4000 layout is regenerated.
+case "$board" in
+gemtek,w1700k-ubi)
+	if [ -e /etc/config/ubootenv ] && [ -e /etc/fw_env.config ] &&
+		[ "$(grep -Ec '^/dev/ubi[0-9]+_[0-9]+[[:space:]]+0x0[[:space:]]+0x4000[[:space:]]+0x1f000[[:space:]]+1$' /etc/fw_env.config)" -eq 2 ]; then
+		exit 0
+	fi
+	rm -f /etc/config/ubootenv /etc/fw_env.config /etc/fw_sys.config
+	;;
+esac
 
 case "$board" in
 gemtek,xr1710g)
 	ubootenv_add_ubi_xr1710g
 	;;
-gemtek,xr1710g-ubi)
-	ubootenv_add_ubi_default
-	;;
+gemtek,xr1710g-ubi|\
 gemtek,xg2010g-ubi|\
 gemtek,xg2010g|\
 gemtek,xg2010g-2g-ubi|\
 gemtek,xg2010g-2g|\
-gemtek,w1700k-ubi|\
 nokia,xg-040g-md-ubi|\
 nokia,xg-040g-tf-ubi)
 	ubootenv_add_ubi_default
+	;;
+gemtek,w1700k-ubi)
+	ubootenv_add_ubi_http_recovery
 	;;
 nokia,xg-040g-md)
 	ubootenv_add_mtd "u-boot-env" "0x1c000" "0x4000" "0x4000"
