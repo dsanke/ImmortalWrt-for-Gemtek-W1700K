@@ -1,0 +1,12 @@
+diff --git a/luci-app-airoha-recovery/root/usr/libexec/rpcd/luci.airoha_recovery b/luci-app-airoha-recovery/root/usr/libexec/rpcd/luci.airoha_recovery
+--- a/luci-app-airoha-recovery/root/usr/libexec/rpcd/luci.airoha_recovery
++++ b/luci-app-airoha-recovery/root/usr/libexec/rpcd/luci.airoha_recovery
+@@ -88,7 +88,7 @@ is_known_board()
+ is_known_board()
+ {
+ 	case "$(board_name 2>/dev/null)" in
+-	gemtek,xr1710g|gemtek,xr1710g-ubi)
++	gemtek,w1700k-ubi|gemtek,xr1710g|gemtek,xr1710g-ubi)
+ 		return 0
+ 		;;
+ 	esac
