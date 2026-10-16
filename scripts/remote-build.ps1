@@ -18,7 +18,7 @@ pwsh ./scripts/remote-build.ps1 -Mode kernel -Jobs 4
 pwsh ./scripts/remote-build.ps1 -Mode world -Jobs 4
 
 .EXAMPLE
-pwsh ./scripts/remote-build.ps1 -Mode world -ConfigSeed 2010.config
+pwsh ./scripts/remote-build.ps1 -Mode world -ConfigSeed config.seed
 #>
 
 [CmdletBinding()]
@@ -35,8 +35,7 @@ param(
     [ValidateRange(1, 64)]
     [int]$Jobs = 4,
 
-    [ValidateSet('1710.config', '2010.config', '2010-2g.config')]
-    [string]$ConfigSeed = '1710.config',
+    [string]$ConfigSeed = 'config.seed',
 
     [switch]$RefreshFeeds,
 

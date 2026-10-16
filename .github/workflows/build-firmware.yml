@@ -1,17 +1,8 @@
-name: Build Firmware
+name: Build W1700K Firmware
 
 on:
   workflow_dispatch:
     inputs:
-      config_seed:
-        description: 'Build config'
-        required: true
-        default: '1710.config'
-        type: choice
-        options:
-          - 1710.config
-          - 2010.config
-          - 2010-2g.config
       release_type:
         description: 'Release Type'
         required: true
@@ -61,19 +52,16 @@ jobs:
           echo "upstream_commit=$upstream_commit" >> $GITHUB_OUTPUT
           echo "version_number=$version_number" >> $GITHUB_OUTPUT
           echo "version_code=$version_code" >> $GITHUB_OUTPUT
-          case '${{ inputs.config_seed }}' in
-            1710.config) device_model=XR1710G ;;
-            2010.config) device_model=XG2010G ;;
-            2010-2g.config) device_model=XG2010G-2G ;;
-            *) echo "Unsupported config seed: ${{ inputs.config_seed }}" >&2; exit 1 ;;
-          esac
+          device_model=W1700K
           echo "device_model=$device_model" >> $GITHUB_OUTPUT
           echo "Build version: ImmortalWrt-for-Gemtek-brightspeed $device_model $version_number"
 
       - name: Setup build environment
         run: |
           sudo apt update
-          sudo apt install -y build-essential clang gcc g++ binutils bzip2 gawk gettext git libncurses-dev libssl-dev python3 python3-setuptools rsync unzip wget xsltproc zlib1g-dev file which perl sed make
+          # CONFIG_BPF_TOOLCHAIN_HOST=y uses the host clang/llvm-strip pair.
+          # llvm-strip is shipped by the llvm package, not by clang.
+          sudo apt install -y build-essential clang llvm gcc g++ binutils bzip2 gawk gettext git libncurses-dev libssl-dev python3 python3-setuptools rsync unzip wget xsltproc zlib1g-dev file which perl sed make
 
       - name: Install feeds
         run: |
@@ -84,9 +72,18 @@ jobs:
       - name: Apply feed patches
         run: FEED_PATCHES_STRICT=1 bash scripts/apply-feed-patches.sh
 
+      - name: Install daede optimized dae/daed
+        run: |
+          # The packages feed ships upstream dae/daed.  The daede feed
+          # (src-git daede) provides the optimized dae/daed (performance
+          # fork, QUIC/PGO patches) plus luci-app-daede, so drop the
+          # upstream copies and install the daede ones.
+          rm -rf package/feeds/packages/dae package/feeds/packages/daed
+          ./scripts/feeds install -a -p daede
+
       - name: Configure
         run: |
-          cp '${{ inputs.config_seed }}' .config
+          cp config.seed .config
           BUILD_DATE='${{ steps.version.outputs.date }}' \
           BUILD_ID='${{ steps.version.outputs.build_id }}' \
           REPO_COMMIT='${{ steps.version.outputs.repo_commit }}' \
@@ -156,7 +153,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: gemtek-${{ inputs.config_seed }}-firmware
+          name: w1700k-firmware
           path: |
             build.log
             build-verbose.log
@@ -195,7 +192,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ format('{0}-{1}', steps.version.outputs.date, steps.version.outputs.repo_commit) }}
-          name: ${{ format('{0} - Gemtek {1} Build ({2})', steps.version.outputs.date, steps.version.outputs.device_model, steps.version.outputs.repo_commit) }}
+          name: ${{ format('{0} - W1700K Build ({1})', steps.version.outputs.date, steps.version.outputs.repo_commit) }}
           body: ${{ steps.release_body.outputs.body }}
           draft: false
           prerelease: ${{ github.event.inputs.release_type == 'prerelease' }}

@@ -13,6 +13,12 @@
 基于 [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) 为 Brightspeed/Gemtek
 XR1710G 与 XG2010G 设备维护的 Airoha AN7581 固件项目。
 
+> [!NOTE]
+> 本仓库是面向 Gemtek W1700K（UBI）的派生构建。默认配置为根目录
+> [`config.seed`](config.seed)，只发布 `gemtek_w1700k-ubi` 镜像，默认管理地址为
+> `192.168.50.1`；
+> 以下 naoki66 上游的 XR1710G/XG2010G 说明仅作参考。
+
 项目的重要功能、稳定性和补丁维护记录见 [更新日志](CHANGELOG.md)。
 
 当前维护两个相互隔离的硬件配置：
