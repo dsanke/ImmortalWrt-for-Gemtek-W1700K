@@ -1,0 +1,28 @@
+From: w1700k lan2 investigation
+Subject: [PATCH] net: pcs: airoha: add a post-config hook for PCS lanes
+
+Some lanes need additional register writes after the generic PCS config
+sequence has completed. Add an optional match-data callback and invoke it
+at the end of airoha_pcs_config().
+
+The callback is wired up only for the AN7581 Ethernet PCS in the following
+JCPLL fix; other lanes keep the existing configuration path.
+
+---
+--- a/drivers/net/pcs/airoha/pcs-airoha-common.c
++++ b/drivers/net/pcs/airoha/pcs-airoha-common.c
+@@ -948,6 +948,9 @@
+ 				AIROHA_PCS_XFI_TX_FC_EN | AIROHA_PCS_XFI_RX_FC_EN :
+ 				0);
+ 
++	if (data->post_config)
++		data->post_config(priv, index, interface);
++
+ 	return 0;
+ }
+ 
+@@ -1641,3 +1644,4 @@
+ 	.link_up = an7581_pcs_phya_link_up,
+ 	.rxlock_workaround = an7581_pcs_rxlock_workaround,
++	.post_config = an7581_pcs_jcpll_recal,
+ };

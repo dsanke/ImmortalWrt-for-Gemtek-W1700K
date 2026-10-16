@@ -4,7 +4,7 @@
 . /lib/functions/system.sh
 
 case "$(board_name)" in
-gemtek,xr1710g|gemtek,xr1710g-ubi) ;;
+gemtek,w1700k-ubi|gemtek,xr1710g|gemtek,xr1710g-ubi) ;;
 *) exit 0 ;;
 esac
 
@@ -165,7 +165,8 @@ set_xr1710g_wan_clientid_default() {
 #
 # Everything above is what this script is actually for: migrating the legacy
 # netdev spelling (ae_wan/eth0/eth1/lan1 and their VLAN sub-interfaces) to
-# wan/lan2, plus the wan DHCP clientid default.
+# wan/lan2, plus the wan DHCP clientid default.  W1700K shipped with
+# eth1=WAN / eth2=10G-LAN, which the same mapping covers.
 #
 config_load network
 config_foreach migrate_xr1710g_device device

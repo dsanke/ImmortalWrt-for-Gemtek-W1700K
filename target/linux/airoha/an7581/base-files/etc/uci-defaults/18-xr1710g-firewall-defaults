@@ -3,7 +3,7 @@
 . /lib/functions/system.sh
 
 case "$(board_name)" in
-gemtek,xr1710g|gemtek,xr1710g-ubi) ;;
+gemtek,w1700k-ubi|gemtek,xr1710g|gemtek,xr1710g-ubi) ;;
 *) exit 0 ;;
 esac
 
